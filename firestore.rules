@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The passcode lives in admin/secret, which nobody can read through the site.
+    function secret() {
+      return get(/databases/$(database)/documents/admin/secret).data.key;
+    }
+    // A lead is someone who entered the current passcode. Changing the passcode
+    // in admin/secret locks everyone out until they enter the new one.
+    function isEditor() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/editors/$(request.auth.uid))
+        && get(/databases/$(database)/documents/editors/$(request.auth.uid)).data.key == secret();
+    }
+    function str(v, max) { return v is string && v.size() <= max; }
+
+    match /admin/{doc} {
+      allow read, write: if false;
+    }
+
+    match /editors/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['key', 'name', 'at'])
+        && request.resource.data.key == secret()
+        && str(request.resource.data.name, 24);
+      allow delete: if false;
+    }
+
+    match /pins/{id} {
+      allow read: if true;
+      allow create, update: if isEditor()
+        && request.resource.data.keys().hasOnly(['tile', 'kind', 'text', 'name', 'at'])
+        && str(request.resource.data.tile, 5)
+        && str(request.resource.data.kind, 10)
+        && str(request.resource.data.text, 200)
+        && str(request.resource.data.name, 24)
+        && request.resource.data.at is number;
+      allow delete: if isEditor();
+    }
+
+    match /owners/{tile} {
+      allow read: if true;
+      allow create, update: if isEditor()
+        && request.resource.data.keys().hasOnly(['guild', 'name', 'at'])
+        && str(request.resource.data.guild, 8)
+        && str(request.resource.data.name, 24)
+        && request.resource.data.at is number;
+      allow delete: if isEditor();
+    }
+
+    match /log/{id} {
+      allow read: if true;
+      allow create: if isEditor()
+        && request.resource.data.keys().hasOnly(['text', 'name', 'at'])
+        && str(request.resource.data.text, 200)
+        && str(request.resource.data.name, 24)
+        && request.resource.data.at is number;
+      allow update, delete: if false;
+    }
+  }
+}

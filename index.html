@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Server 267 War Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-screen field console. Map board fills the left, a dossier rail on the right (stacks under the map on phones). */
+:root{
+  --bg:#eef1f7; --panel:#ffffff; --ink:#18213a; --muted:#5b6682; --line:#d5dbe8;
+  --sea:#2e4f70; --tile:#dfe3f1; --tile-edge:#b9bfd6; --tile-ink:#232c47;
+  --accent:#2f6fe4; --accent-ink:#ffffff; --sel:#ffb020;
+  --warm:#9fdcae; --cool:#a4e0d8; --frosty:#a9d4f2; --snowy:#b6c1f4; --frozen:#949fea; --glacial:#7480d8; --temple:#5a4fc0;
+  --k-target:#e5484d; --k-rally:#2f6fe4; --k-defend:#1f9d6b; --k-mine:#c98a12; --k-note:#7a6ad8;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1424; --panel:#151d31; --ink:#e6ebf7; --muted:#97a2be; --line:#27324c;
+  --sea:#1d3550; --tile:#c9cfe2; --tile-edge:#9aa2c0; --tile-ink:#1b2340;
+  --accent:#5b8ff0; --accent-ink:#0b1222; --sel:#ffc24a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1424; --panel:#151d31; --ink:#e6ebf7; --muted:#97a2be; --line:#27324c;
+  --sea:#1d3550; --tile:#c9cfe2; --tile-edge:#9aa2c0; --tile-ink:#1b2340;
+  --accent:#5b8ff0; --accent-ink:#0b1222; --sel:#ffc24a; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;display:flex;flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;box-sizing:border-box;gap:12px}
+*{box-sizing:border-box}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;justify-content:space-between}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:1.9rem;letter-spacing:.02em;margin:0;line-height:1;text-wrap:balance}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:.85rem}
+.brand .srv{font-family:var(--f-mono);font-size:.78rem;color:var(--accent)}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+.seg{display:inline-flex;flex-wrap:wrap;max-width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:7px 12px;cursor:pointer;font-family:var(--f-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.85rem;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.chk{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:.85rem;cursor:pointer}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px}
+.board{position:relative;min-height:0;background:var(--sea);border-radius:12px;overflow:hidden;touch-action:none}
+.board svg{width:100%;height:100%;display:block;cursor:grab;user-select:none}
+.board svg.dragging{cursor:grabbing}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:38px;height:38px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(10,20,40,.7);color:#fff;font-size:1.2rem;cursor:pointer}
+.legend-belt{position:absolute;left:10px;bottom:10px;display:flex;gap:2px;background:rgba(10,20,40,.72);padding:6px;border-radius:8px;color:#fff;font-size:.7rem;font-family:var(--f-mono);flex-wrap:wrap;max-width:calc(100% - 70px)}
+.legend-belt span{display:flex;align-items:center;gap:4px;padding:2px 6px}
+.legend-belt i{width:10px;height:10px;border-radius:2px;display:inline-block}
+aside{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{font-family:var(--f-display);font-weight:700;font-size:1.05rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px;color:var(--muted)}
+.tilehead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tilehead .coord{font-family:var(--f-mono);font-size:1rem;background:var(--ink);color:var(--panel);padding:2px 7px;border-radius:5px}
+.tilehead h3{margin:0;font-family:var(--f-display);font-size:1.5rem;font-weight:700;line-height:1.1}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0 0;font-size:.9rem}
+dt{color:var(--muted)}dd{margin:0;font-weight:500}
+.tag{font-family:var(--f-mono);font-size:.8rem;padding:1px 6px;border-radius:4px;color:#111;display:inline-block}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.field{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
+select,input[type=text],textarea{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%}
+textarea{resize:vertical;min-height:60px}
+.btn{border:0;border-radius:7px;padding:8px 14px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.pins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.pins li{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.pins li:hover{border-color:var(--accent)}
+.pins .k{font-family:var(--f-display);font-weight:700;font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:#fff;padding:2px 6px;border-radius:4px;align-self:center}
+.pins .t{font-size:.9rem;min-width:0;overflow-wrap:anywhere}
+.pins .m{grid-column:2/3;font-size:.75rem;color:var(--muted)}
+.pins .x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:1rem;padding:0 2px}
+.guilds{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.guilds button{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 8px;cursor:pointer;text-align:left;font-size:.85rem}
+.guilds button[aria-pressed="true"]{border-color:var(--sel);box-shadow:0 0 0 1px var(--sel)}
+.guilds i{width:12px;height:12px;border-radius:3px;flex:none}
+.guilds small{margin-left:auto;font-family:var(--f-mono);color:var(--muted)}
+.note{font-size:.8rem;color:var(--muted);margin:8px 0 0}
+.status{font-size:.8rem;color:var(--muted)}
+.empty{color:var(--muted);font-size:.9rem;margin:0}
+/* map text */
+.lbl{font-family:var(--f-display);font-weight:700;fill:var(--tile-ink);pointer-events:none}
+.own{font-family:var(--f-mono);font-weight:500;pointer-events:none}
+[hidden]{display:none!important}
+.z-name{display:none}
+svg.z1 .z-name{display:inline}
+.axis{font-family:var(--f-mono);fill:#c9d6ea;font-size:22px}
+.gen{font-family:var(--f-mono);font-size:9px;fill:#fff;pointer-events:none}
+.dim{opacity:.22}
+@media (max-width:820px){
+  main{grid-template-columns:1fr;grid-template-rows:auto auto}
+  .board{aspect-ratio:1/1;max-width:100%}
+  .seg button{padding:7px 9px}
+  aside{overflow:visible}
+  body{height:auto;min-height:100%}
+  html,body{height:auto}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.unlock{display:flex;flex-direction:column;gap:8px}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.85rem}
+.log li{display:grid;grid-template-columns:auto 1fr;gap:10px}
+.log time{font-family:var(--f-mono);font-size:.75rem;color:var(--muted);padding-top:2px}
+.btn.edit{font-family:var(--f-display);letter-spacing:.06em;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Season 1 War Map</h1>
+    <p><span class="srv">SERVER #267</span> · Layout and holdings from the map video, Oct 18, 2026 · Plans and owner changes update live for everyone</p>
+  </div>
+  <div class="modes">
+    <div class="seg" role="group" aria-label="Map mode">
+      <button id="m-conquest" aria-pressed="true">Conquest</button>
+      <button id="m-temp" aria-pressed="false">Temperature</button>
+      <button id="m-capture" aria-pressed="false">Video capture</button>
+    </div>
+    <div class="seg" role="group" aria-label="Shrine type filter">
+      <button id="f-all" aria-pressed="true">All</button>
+      <button id="f-W" aria-pressed="false">Woodsong</button>
+      <button id="f-G" aria-pressed="false">Goldglade</button>
+      <button id="f-S" aria-pressed="false">Steelstory</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="f-open"> Unclaimed only</label>
+    <button class="btn edit" id="editbtn">Edit</button>
+  </div>
+</header>
+
+<main>
+  <div class="board" id="board">
+    <svg id="map" viewBox="-60 -60 1420 1420" preserveAspectRatio="xMidYMid meet" aria-label="Season 1 map grid">
+      <defs>
+        <path id="shield" d="M-11,-12 h22 v14 l-11,8 l-11,-8 z"/>
+      </defs>
+      <g id="axes"></g>
+      <image id="cap" href="map-capture.jpg" x="0" y="0" width="1300" height="1300" opacity="0" preserveAspectRatio="none"></image>
+      <g id="tiles"></g>
+      <g id="center"></g>
+      <g id="gens"></g>
+      <g id="pinlayer"></g>
+      <rect id="selbox" x="0" y="0" width="100" height="100" fill="none" stroke="var(--sel)" stroke-width="6" rx="4" visibility="hidden"></rect>
+    </svg>
+    <div class="legend-belt" id="beltlegend" hidden></div>
+    <div class="zoom">
+      <button id="z-in" aria-label="Zoom in">+</button>
+      <button id="z-out" aria-label="Zoom out">−</button>
+      <button id="z-fit" aria-label="Fit map" style="font-size:.8rem">FIT</button>
+    </div>
+  </div>
+
+  <aside>
+    <section class="card" id="unlock" hidden>
+      <h2>Lead editing</h2>
+      <form class="unlock" id="unlockform">
+        <label class="field">Your name on plans<input type="text" id="u-name" maxlength="24" placeholder="e.g. Green" autocomplete="nickname"></label>
+        <label class="field">Passcode<input type="password" id="u-key" maxlength="64" autocomplete="current-password"></label>
+        <div class="row"><button class="btn" type="submit" id="u-go">Start editing</button><span class="status" id="u-msg"></span></div>
+      </form>
+      <div id="u-on" hidden>
+        <p class="empty" id="u-who"></p>
+        <div class="row" style="margin-top:10px"><button class="btn ghost" id="u-stop">Stop editing on this device</button></div>
+      </div>
+    </section>
+    <section class="card" id="detail">
+      <h2>Tile</h2>
+      <p class="empty">Tap any tile to see its shrine, belt, owner and plans.</p>
+    </section>
+    <section class="card">
+      <h2>Plans on the map</h2>
+      <ul class="pins" id="allpins"></ul>
+      <p class="status" id="dbstatus">Connecting to shared plans…</p>
+    </section>
+    <section class="card">
+      <h2>Guilds</h2>
+      <div class="guilds" id="guilds"></div>
+      <p class="note">Tap a guild to highlight its land. Counts are shrines held / tiles held.</p>
+    </section>
+    <section class="card">
+      <h2>Change log</h2>
+      <ol class="log" id="log"><li><span></span><span class="empty">No changes yet.</span></li></ol>
+    </section>
+  </aside>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+// ---------- Base layout from the video (rows 0-12 top→bottom, cols 0-12 left→right) ----------
+const N = 13, T = 100;
+const COLS = "ABCDEFGHIJKLM";
+const ROWS = [ // shrine tiles sit where row+col is odd, read left to right
+  "WSGWSG","GWSGWSW","GGWSGG","SSGWSWS","SSWSGW","WWGAWSG","WWCCSS","GWWFGGW","SWSWGG","SGGSWWS","WSWGSW","WGSWGSG","GSWGSW"
+];
+const TYPE = {W:{name:"Woodsong Shrine",short:"Woodsong",color:"#3f9b57"},G:{name:"Goldglade Shrine",short:"Goldglade",color:"#c9961a"},S:{name:"Steelstory Shrine",short:"Steelstory",color:"#5c7591"},
+  A:{name:"Armigo Altar",short:"Armigo",color:"#8a5cd6"},C:{name:"Scholar Sacrarium",short:"Scholar",color:"#8a5cd6"},F:{name:"Craftsman Chancel",short:"Craftsman",color:"#8a5cd6"}};
+const BELTS = [["Warm Belt",-15,"--warm"],["Cool Belt",-30,"--cool"],["Frosty Belt",-40,"--frosty"],["Snowy Belt",-50,"--snowy"],["Frozen Belt",-60,"--frozen"],["Glacial Belt",-70,"--glacial"],["Temple",-80,"--temple"]];
+const BASE_OWN = { // territory tiles per guild as seen in the video
+  DrEv:["0-0","0-1","0-2","0-3","1-0","1-1"],
+  Fu2:["0-5","0-6","0-7","0-8","0-9","1-7","1-9"],
+  OBM:["0-11","0-12","1-11","1-12"],
+  RAZ:["2-0","3-0","3-1","4-0"],
+  NOX:["3-12","4-12","5-11","5-12","6-12","7-11","7-12"],
+  SVR:["5-0","5-1","6-0","7-0","7-1","8-0","9-0"],
+  "1406":["11-0","12-0"],
+  PLR:["11-5","11-7","12-3","12-4","12-5","12-6","12-7"],
+  LVOR:["12-11","12-12"]
+};
+const GENS = [["DrEv","1-0"],["Fu2","0-5"],["OBM","1-11"],["RAZ","3-0"],["NOX","6-12"],["SVR","6-0"],["1738","5-0"],["ANE","7-0"],["1406","12-0"],["PLR","12-5"],["LVOR","12-11"],["WASH","12-12"],["RENF","12-12"]];
+const GCOLOR = {DrEv:"#9d93ff",Fu2:"#ecd23e",OBM:"#d9479b",RAZ:"#f07f72",NOX:"#e0393f",SVR:"#8b7cf6",1406:"#e0a43a",PLR:"#3d86f5",LVOR:"#f3a27c",WASH:"#f3a27c",RENF:"#f3a27c",1738:"#8b7cf6",ANE:"#8b7cf6"};
+const KINDS = {target:["Target","--k-target"],rally:["Rally","--k-rally"],defend:["Defend","--k-defend"],mine:["Mine plan","--k-mine"],note:["Note","--k-note"]};
+
+const tiles = [];
+for (let r=0;r<N;r++) for (let c=0;c<N;c++){
+  const ring = Math.min(r,c,N-1-r,N-1-c);
+  let kind="mine", type=null;
+  if (r===6&&c===6) kind="temple";
+  else if ((r+c)%2===1){ type = ROWS[r][(c - (r%2===0?1:0))/2]; kind = "WGS".includes(type)?"shrine":"special"; }
+  tiles.push({r,c,id:r+"-"+c,ring,kind,type,level: kind==="temple"?7:(kind==="mine"?null:ring+1)});
+}
+const baseOwner = {};
+for (const [g,list] of Object.entries(BASE_OWN)) for (const id of list) baseOwner[id]=g;
+const coord = t => COLS[t.c]+(t.r+1);
+const tileName = t => t.kind==="temple"?"Temple":t.kind==="mine"?"Mine":TYPE[t.type].name;
+
+// ---------- Shared state ----------
+let overrides = {};   // id -> guild ("" = unclaimed)
+let pins = [];        // {id, tile, kind, text, by, at}
+let fs=null, auth=null, canWrite=false, myName="", logs=[];
+try{ myName=localStorage.getItem("wm-name")||""; }catch(e){}
+const ownerOf = id => (id in overrides) ? overrides[id] : (baseOwner[id]||"");
+function gColor(g){ if(GCOLOR[g]) return GCOLOR[g]; let h=0; for(const ch of g) h=(h*31+ch.charCodeAt(0))%360; return `hsl(${h} 70% 62%)`; }
+
+// ---------- View state ----------
+let mode="conquest", typeFilter="all", openOnly=false, guildFocus=null, selected=null;
+const svg=document.getElementById("map"), NS="http://www.w3.org/2000/svg";
+const el=(n,a={},p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function drawAxes(){
+  const g=document.getElementById("axes");
+  for(let i=0;i<N;i++){
+    el("text",{x:i*T+50,y:-20,"text-anchor":"middle",class:"axis"},g).textContent=COLS[i];
+    el("text",{x:i*T+50,y:N*T+40,"text-anchor":"middle",class:"axis"},g).textContent=COLS[i];
+    el("text",{x:-22,y:i*T+58,"text-anchor":"middle",class:"axis"},g).textContent=i+1;
+    el("text",{x:N*T+24,y:i*T+58,"text-anchor":"middle",class:"axis"},g).textContent=i+1;
+  }
+}
+
+function icon(g,t,x,y,s){
+  const col=TYPE[t.type]?.color||"#666";
+  if(t.type==="W"){ el("path",{d:`M${x},${y-s} C${x+s},${y-s*.3} ${x+s*.6},${y+s*.8} ${x},${y+s} C${x-s*.6},${y+s*.8} ${x-s},${y-s*.3} ${x},${y-s}z`,fill:col},g); el("path",{d:`M${x},${y-s*.6} V${y+s*.9}`,stroke:"#fff","stroke-width":1.6,opacity:.7},g); }
+  else if(t.type==="G"){ el("path",{d:`M${x},${y-s} L${x+s},${y} L${x},${y+s} L${x-s},${y}z`,fill:col},g); el("path",{d:`M${x},${y-s*.5} L${x+s*.5},${y} L${x},${y+s*.5} L${x-s*.5},${y}z`,fill:"#fff",opacity:.35},g); }
+  else if(t.type==="S"){ const p=[];for(let i=0;i<6;i++){const a=Math.PI/3*i+Math.PI/6;p.push((x+s*Math.cos(a)).toFixed(1)+","+(y+s*Math.sin(a)).toFixed(1));} el("polygon",{points:p.join(" "),fill:col},g); el("circle",{cx:x,cy:y,r:s*.38,fill:"#fff",opacity:.45},g); }
+  else { el("rect",{x:x-s*.8,y:y-s*.8,width:s*1.6,height:s*1.6,rx:4,fill:col,transform:`rotate(45 ${x} ${y})`},g); el("circle",{cx:x,cy:y,r:s*.35,fill:"#fff",opacity:.6},g); }
+}
+
+function passes(t){
+  if(typeFilter!=="all" && !(t.kind==="shrine"&&t.type===typeFilter)) return false;
+  if(openOnly && (t.kind!=="shrine" || ownerOf(t.id))) return false;
+  if(guildFocus && ownerOf(t.id)!==guildFocus) return false;
+  return true;
+}
+
+function drawTiles(){
+  const g=document.getElementById("tiles"); g.textContent="";
+  const capOn = mode==="capture";
+  for(const t of tiles){
+    const x=t.c*T, y=t.r*T, own=ownerOf(t.id);
+    const tg=el("g",{"data-id":t.id,class:passes(t)?"":"dim",style:"cursor:pointer"},g);
+    let fill=css("--tile");
+    if(mode==="temp") fill=css(BELTS[t.ring][2]);
+    else if(own) fill=`color-mix(in srgb, ${gColor(own)} 62%, ${css("--tile")})`;
+    el("rect",{x:x+1,y:y+1,width:T-2,height:T-2,rx:3,style:`fill:${fill}`,"fill-opacity":capOn?0:1,stroke:capOn?"rgba(255,255,255,.35)":css("--tile-edge"),"stroke-width":1.5},tg);
+    if(capOn) continue;
+    if(t.kind==="mine"){
+      el("path",{d:`M${x+38},${y+62} L${x+62},${y+38} M${x+52},${y+34} Q${x+66},${y+36} ${x+68},${y+50}`,stroke:"rgba(35,44,71,.45)","stroke-width":4,fill:"none","stroke-linecap":"round"},tg);
+      const tx=el("text",{x:x+50,y:y+88,"text-anchor":"middle",class:"lbl z-name","font-size":12,opacity:.6},tg); tx.textContent="Mine";
+    } else if(t.kind==="temple"){
+      el("circle",{cx:x+50,cy:y+48,r:24,fill:"#5b4bc4"},tg);
+      el("path",{d:`M${x+36},${y+56} h28 M${x+40},${y+56} v-14 M${x+50},${y+56} v-14 M${x+60},${y+56} v-14 M${x+35},${y+42} l15,-9 l15,9z`,stroke:"#fff","stroke-width":2.5,fill:"#fff","stroke-linejoin":"round"},tg);
+      el("text",{x:x+50,y:y+90,"text-anchor":"middle",class:"lbl","font-size":16},tg).textContent="TEMPLE · 7";
+    } else {
+      icon(tg,t,x+50,y+46,t.kind==="special"?15:17);
+      // level badge
+      const bg=el("g",{transform:`translate(${x+17},${y+19})`},tg);
+      el("use",{href:"#shield",fill:own?gColor(own):"#5f6886",stroke:"#fff","stroke-width":1.5},bg);
+      el("text",{x:0,y:3,"text-anchor":"middle",class:"lbl","font-size":14,fill:"#fff",style:"fill:#fff"},bg).textContent=t.level;
+      const nm=el("text",{x:x+50,y:y+86,"text-anchor":"middle",class:"lbl z-name","font-size":t.kind==="special"?12:14},tg); nm.textContent=TYPE[t.type].short;
+      if(own){ const o=el("text",{x:x+94,y:y+20,"text-anchor":"end",class:"own","font-size":13,fill:"#141a2e"},tg); o.textContent=own; }
+    }
+  }
+  // center buildings: four altars on the Temple's corners
+  const cg=document.getElementById("center"); cg.textContent="";
+  if(!capOn){
+    const alt=[["Sunken",600,600,"#3aa0c8"],["Verdant",700,600,"#3f9b57"],["Burning",600,700,"#e0683a"],["Thundering",700,700,"#9a6ae0"]];
+    for(const [n,x,y,c] of alt){ el("circle",{cx:x,cy:y,r:11,fill:c,stroke:"#fff","stroke-width":2.5},cg); const tx=el("text",{x,y:y+(y<650?-15:24),"text-anchor":"middle",class:"lbl z-name","font-size":11},cg); tx.textContent=n+" Altar"; }
+  }
+  drawGens(); drawPins(); drawSel();
+}
+
+function drawGens(){
+  const g=document.getElementById("gens"); g.textContent="";
+  if(mode==="capture") return;
+  const per={};
+  for(const [guild,id] of GENS){ per[id]=(per[id]||0)+1; const [r,c]=id.split("-").map(Number); const k=per[id]-1;
+    const x=c*T+70-k*20, y=r*T+60;
+    el("rect",{x:x-8,y:y-8,width:16,height:16,rx:3,fill:"#16203a",stroke:gColor(guild),"stroke-width":3},g);
+    el("path",{d:`M${x-3},${y+4} L${x+1},${y-1} L${x-1},${y-1} L${x+3},${y-5}`,stroke:"#ffd25a","stroke-width":1.8,fill:"none"},g);
+  }
+}
+
+function drawPins(){
+  const g=document.getElementById("pinlayer"); g.textContent="";
+  const by={}; for(const p of pins) (by[p.tile]=by[p.tile]||[]).push(p);
+  for(const [id,list] of Object.entries(by)){
+    const [r,c]=id.split("-").map(Number); const x=c*T+82, y=r*T+80;
+    const col=css(KINDS[list[0].kind]?.[1]||"--k-note");
+    const pg=el("g",{"data-id":id,style:"cursor:pointer"},g);
+    el("path",{d:`M${x},${y+14} C${x-4},${y+6} ${x-11},${y} ${x-11},${y-7} A11,11 0 1 1 ${x+11},${y-7} C${x+11},${y} ${x+4},${y+6} ${x},${y+14}z`,fill:col,stroke:"#fff","stroke-width":2},pg);
+    el("text",{x,y:y-3,"text-anchor":"middle",class:"lbl","font-size":12,style:"fill:#fff"},pg).textContent=list.length;
+  }
+}
+function drawSel(){
+  const b=document.getElementById("selbox");
+  if(!selected){b.setAttribute("visibility","hidden");return;}
+  const t=tiles.find(t=>t.id===selected); b.setAttribute("x",t.c*T); b.setAttribute("y",t.r*T); b.setAttribute("visibility","visible");
+}
+
+// ---------- Pan & zoom ----------
+let vb={x:-60,y:-60,w:1420,h:1420};
+function applyVB(){ svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`); const px=svg.clientWidth/vb.w*T, py=svg.clientHeight/vb.h*T; svg.classList.toggle("z1",Math.min(px,py)>70); }
+function toWorld(cx,cy){ const p=svg.createSVGPoint(); p.x=cx;p.y=cy; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+function zoomAt(f,cx,cy){ const w=toWorld(cx,cy); const nw=Math.min(1600,Math.max(160,vb.w*f)); const k=nw/vb.w; vb={x:w.x-(w.x-vb.x)*k,y:w.y-(w.y-vb.y)*k,w:nw,h:vb.h*k}; applyVB(); }
+svg.addEventListener("wheel",e=>{e.preventDefault();zoomAt(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY);},{passive:false});
+const ptrs=new Map(); let drag=null, moved=false, pinchD=0, downId=null;
+svg.addEventListener("pointerdown",e=>{const dg=e.target.closest&&e.target.closest("[data-id]"); downId=dg?dg.getAttribute("data-id"):null; svg.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;
+  if(ptrs.size===1) drag={x:e.clientX,y:e.clientY,vb:{...vb}};
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinchD=Math.hypot(a.x-b.x,a.y-b.y);drag=null;}
+});
+svg.addEventListener("pointermove",e=>{ if(!ptrs.has(e.pointerId))return; ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y); if(pinchD){zoomAt(pinchD/d,(a.x+b.x)/2,(a.y+b.y)/2);} pinchD=d; moved=true; return;}
+  if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>4){moved=true;svg.classList.add("dragging");}
+    const s=vb.w/svg.getBoundingClientRect().width*Math.max(1,(svg.clientWidth/svg.clientHeight)/(vb.w/vb.h)); vb.x=drag.vb.x-dx*s; vb.y=drag.vb.y-dy*s; applyVB(); }
+});
+function endPtr(e){ ptrs.delete(e.pointerId); if(ptrs.size<2) pinchD=0; if(ptrs.size===0){ svg.classList.remove("dragging");
+    if(!moved && downId) select(downId); drag=null; } }
+svg.addEventListener("pointerup",endPtr); svg.addEventListener("pointercancel",e=>{ptrs.delete(e.pointerId);drag=null;});
+const rectC=()=>{const r=svg.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2];};
+document.getElementById("z-in").onclick=()=>zoomAt(1/1.4,...rectC());
+document.getElementById("z-out").onclick=()=>zoomAt(1.4,...rectC());
+document.getElementById("z-fit").onclick=()=>{vb={x:-60,y:-60,w:1420,h:1420};applyVB();};
+new ResizeObserver(applyVB).observe(svg);
+function focusTile(id){ const [r,c]=id.split("-").map(Number); const w=Math.min(vb.w,560); vb={x:c*T+50-w/2,y:r*T+50-w/2,w,h:w}; applyVB(); }
+
+// ---------- Panel ----------
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+function allGuilds(){ const s=new Set([...Object.keys(BASE_OWN),...Object.values(overrides).filter(Boolean)]); return [...s].sort((a,b)=>a.localeCompare(b)); }
+function whenTxt(ms){ const d=new Date(ms); return d.toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}); }
+function byTxt(p){ return p.name || "In-game marker"; }
+
+function select(id){ selected=id; drawSel(); renderDetail(); }
+function renderDetail(){
+  const box=document.getElementById("detail");
+  if(!selected){ box.innerHTML='<h2>Tile</h2><p class="empty">Tap any tile to see its shrine, belt, owner and plans.</p>'; return; }
+  const t=tiles.find(x=>x.id===selected), own=ownerOf(t.id), belt=BELTS[t.ring];
+  const changed = t.id in overrides;
+  const tp=pins.filter(p=>p.tile===t.id).sort((a,b)=>a.at-b.at);
+  const opts=['<option value="">Unclaimed</option>',...allGuilds().map(g=>`<option value="${esc(g)}"${g===own?" selected":""}>${esc(g)}</option>`),'<option value="__new">New guild tag…</option>'].join("");
+  box.innerHTML=`<h2>Tile</h2>
+   <div class="tilehead"><span class="coord">${coord(t)}</span><h3>${esc(tileName(t))}</h3></div>
+   <dl>
+    ${t.level?`<dt>Level</dt><dd>${t.level}</dd>`:""}
+    <dt>Belt</dt><dd>${belt[0]} · ${belt[1]}°C (Lvl ${t.ring+1} zone)</dd>
+    <dt>Held by</dt><dd>${own?`<span class="tag" style="background:${gColor(own)}">${esc(own)}</span>`:"Unclaimed"}${changed?' <span class="status">· updated by a lead</span>':' <span class="status">· from video</span>'}</dd>
+    ${t.kind==="temple"?"<dt>Around it</dt><dd>Sunken, Verdant, Burning and Thundering Altars on its four corners</dd>":""}
+   </dl>
+   <div class="row" style="margin-top:12px">
+     <label class="field" style="flex:1;min-width:140px">Change owner<select id="own-sel" ${canWrite?"":"disabled"}>${opts}</select></label>
+     ${changed?'<button class="btn ghost" id="own-reset" style="align-self:flex-end">Back to video</button>':""}
+   </div>
+   <input type="text" id="own-new" placeholder="Guild tag, e.g. PLR" maxlength="8" hidden style="margin-top:8px">
+   <h2 style="margin-top:16px">Plans here</h2>
+   ${tp.length?`<ul class="pins">${tp.map(pinLi).join("")}</ul>`:'<p class="empty">No plans on this tile yet.</p>'}
+   <form id="pinform" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+     <div class="row">
+       <label class="field" style="flex:0 0 130px">Type<select id="pin-kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}">${v[0]}</option>`).join("")}</select></label>
+     </div>
+     <label class="field">Plan<textarea id="pin-text" maxlength="200" placeholder="e.g. Hit at reset, all PLR rally here"></textarea></label>
+     <div class="row"><button class="btn" type="submit" ${canWrite?"":"disabled"}>Add plan</button><span class="status" id="pinmsg">${canWrite?"":"Tap Edit at the top and enter the passcode to add plans."}</span></div>
+   </form>`;
+  const sel=document.getElementById("own-sel"), nw=document.getElementById("own-new");
+  sel.onchange=()=>{ if(sel.value==="__new"){ nw.hidden=false; nw.focus(); return;} nw.hidden=true; setOwner(t.id, sel.value); };
+  nw.onkeydown=e=>{ if(e.key==="Enter"&&nw.value.trim()){ setOwner(t.id, nw.value.trim().replace(/[\[\]]/g,"")); } };
+  const rs=document.getElementById("own-reset"); if(rs) rs.onclick=()=>resetOwner(t.id);
+  document.getElementById("pinform").onsubmit=e=>{e.preventDefault(); addPin(t.id, document.getElementById("pin-kind").value, document.getElementById("pin-text").value.trim());};
+  bindPinList(box);
+}
+function pinLi(p){ const k=KINDS[p.kind]||KINDS.note; const t=tiles.find(x=>x.id===p.tile);
+  return `<li data-tile="${p.tile}"><span class="k" style="background:var(${k[1]})">${k[0]}</span><span class="t"><b style="font-family:var(--f-mono);font-weight:500">${coord(t)}</b> ${esc(p.text)}</span>${canWrite?`<button class="x" data-del="${p.id}" aria-label="Remove plan">✕</button>`:"<span></span>"}<span class="m">${esc(byTxt(p))} · ${whenTxt(p.at)}</span></li>`; }
+function bindPinList(root){
+  root.querySelectorAll("li[data-tile]").forEach(li=>li.onclick=e=>{ if(e.target.closest("[data-del]")) return; const id=li.dataset.tile; select(id); focusTile(id); });
+  root.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delPin(b.dataset.del));
+}
+function renderPinList(){
+  const ul=document.getElementById("allpins"); const sorted=[...pins].sort((a,b)=>b.at-a.at);
+  ul.innerHTML = sorted.length? sorted.map(pinLi).join("") : '<li style="cursor:default;display:block" class="empty">No plans yet. Pick a tile and add the first one.</li>';
+  bindPinList(ul);
+}
+function renderGuilds(){
+  const box=document.getElementById("guilds"); const gs=allGuilds();
+  box.innerHTML=gs.map(g=>{ const held=tiles.filter(t=>ownerOf(t.id)===g); const sh=held.filter(t=>t.kind==="shrine").length;
+    return `<button data-g="${esc(g)}" aria-pressed="${guildFocus===g}"><i style="background:${gColor(g)}"></i>${esc(g)}<small>${sh}/${held.length}</small></button>`; }).join("");
+  box.querySelectorAll("button").forEach(b=>b.onclick=()=>{ guildFocus = guildFocus===b.dataset.g?null:b.dataset.g; renderAll(); });
+}
+function renderAll(){ drawTiles(); renderDetail(); renderPinList(); renderGuilds(); }
+
+// ---------- Controls ----------
+function setPressed(ids,on){ ids.forEach(i=>document.getElementById(i).setAttribute("aria-pressed",String(i===on))); }
+[["m-conquest","conquest"],["m-temp","temp"],["m-capture","capture"]].forEach(([id,m])=>document.getElementById(id).onclick=()=>{ mode=m; setPressed(["m-conquest","m-temp","m-capture"],id);
+  document.getElementById("cap").setAttribute("opacity",m==="capture"?1:0); document.getElementById("beltlegend").hidden=m!=="temp"; drawTiles(); });
+["all","W","G","S"].forEach(f=>document.getElementById("f-"+f).onclick=()=>{ typeFilter=f; setPressed(["f-all","f-W","f-G","f-S"],"f-"+f); drawTiles(); });
+document.getElementById("f-open").onchange=e=>{ openOnly=e.target.checked; drawTiles(); };
+document.getElementById("beltlegend").innerHTML=BELTS.map(b=>`<span><i style="background:var(${b[2]})"></i>${b[0].split(" ")[0]} ${b[1]}°</span>`).join("");
+
+// ---------- Shared data (Firebase) ----------
+const status=m=>document.getElementById("dbstatus").textContent=m;
+const $=id=>document.getElementById(id);
+const tileCoord=id=>coord(tiles.find(t=>t.id===id));
+async function addLog(text){ if(!fs) return; try{ await fs.collection("log").add({text:text.slice(0,200),name:myName.slice(0,24),at:Date.now()}); }catch(e){} }
+async function setOwner(id,g){ if(!fs||!canWrite) return; try{ await fs.doc("owners/"+id).set({guild:g.slice(0,8),name:myName,at:Date.now()}); addLog(`set ${tileCoord(id)} to ${g||"Unclaimed"}`); }catch(e){ writeFail(e); } }
+async function resetOwner(id){ if(!fs||!canWrite) return; try{ await fs.doc("owners/"+id).delete(); addLog(`reset ${tileCoord(id)} to the video holdings`); }catch(e){ writeFail(e); } }
+async function addPin(tile,kind,text){ if(!text){ $("pinmsg").textContent="Write the plan first."; return; } if(!fs||!canWrite) return;
+  try{ await fs.collection("pins").add({tile,kind,text:text.slice(0,200),name:myName,at:Date.now()}); $("pin-text").value=""; addLog(`added ${KINDS[kind][0]} on ${tileCoord(tile)}: ${text}`); }catch(e){ writeFail(e); } }
+async function delPin(id){ if(!fs||!canWrite) return; const p=pins.find(x=>x.id===id); try{ await fs.doc("pins/"+id).delete(); if(p) addLog(`removed a plan on ${tileCoord(p.tile)}: ${p.text}`); }catch(e){ writeFail(e); } }
+function writeFail(e){ if(e&&e.code==="permission-denied"){ setEditor(false); status("Your edit access ended, probably because the passcode changed. Tap Edit and enter the new one."); } else status("Couldn't save just now. Check your connection and try again."); }
+
+function setEditor(on){ canWrite=on; $("editbtn").textContent=on?`Editing as ${myName||"lead"}`:"Edit";
+  $("unlockform").hidden=on; $("u-on").hidden=!on; $("u-who").textContent=on?`You're editing as ${myName}. Plans and owner changes you make are saved for everyone.`:"";
+  renderAll(); }
+$("editbtn").onclick=()=>{ const c=$("unlock"); c.hidden=!c.hidden; if(!c.hidden){ $("u-name").value=myName; (myName?$("u-key"):$("u-name")).focus(); } };
+$("unlockform").onsubmit=async e=>{ e.preventDefault();
+  const name=$("u-name").value.trim(), key=$("u-key").value;
+  if(!name||!key){ $("u-msg").textContent="Enter your name and the passcode."; return; }
+  if(!fs){ $("u-msg").textContent="Shared plans aren't connected yet."; return; }
+  $("u-go").disabled=true; $("u-msg").textContent="Checking…";
+  try{
+    if(!auth.currentUser) await auth.signInAnonymously();
+    await fs.doc("editors/"+auth.currentUser.uid).set({key,name,at:Date.now()});
+    myName=name; try{ localStorage.setItem("wm-name",name); }catch(e){}
+    $("u-key").value=""; $("u-msg").textContent=""; setEditor(true);
+  }catch(err){
+    $("u-msg").textContent = err&&err.code==="permission-denied" ? "That passcode didn't work." :
+      (err&&String(err.code).startsWith("auth/")) ? "Sign-in is off. Turn on Anonymous sign-in in Firebase (see the setup guide)." : "Couldn't connect. Try again.";
+  } finally { $("u-go").disabled=false; }
+};
+$("u-stop").onclick=async()=>{ try{ await auth.signOut(); }catch(e){} setEditor(false); };
+
+function renderLog(){ const ol=$("log");
+  ol.innerHTML = logs.length ? logs.map(l=>`<li><time>${esc(whenTxt(l.at))}</time><span><b>${esc(l.name||"A lead")}</b> ${esc(l.text)}</span></li>`).join("") : '<li><span></span><span class="empty">No changes yet.</span></li>'; }
+
+drawAxes(); renderAll(); applyVB();
+(function initFirebase(){
+  const cfg=window.FIREBASE_CONFIG;
+  if(!window.firebase||!cfg||!cfg.apiKey||cfg.apiKey.startsWith("PASTE")){ status("Shared plans aren't connected yet. The map works; plans appear once Firebase is set up."); return; }
+  firebase.initializeApp(cfg); fs=firebase.firestore(); auth=firebase.auth();
+  const lost=()=>status("Lost the live connection. Reload to reconnect.");
+  fs.collection("owners").onSnapshot(s=>{ const o={}; s.docs.forEach(d=>{ o[d.id]=d.data().guild||""; }); overrides=o; renderAll(); }, lost);
+  fs.collection("pins").onSnapshot(s=>{ pins=s.docs.map(d=>({id:d.id,...d.data()})); status("Live. Anyone with the link sees changes as they happen."); renderAll(); }, lost);
+  fs.collection("log").orderBy("at","desc").limit(40).onSnapshot(s=>{ logs=s.docs.map(d=>d.data()); renderLog(); }, ()=>{});
+  auth.onAuthStateChanged(async u=>{ if(!u){ if(canWrite) setEditor(false); return; }
+    try{ const d=await fs.doc("editors/"+u.uid).get(); if(d.exists){ if(!myName) myName=d.data().name||""; setEditor(true); } }catch(e){ setEditor(false); } });
+})();
+</script>
+</body>
+</html>
