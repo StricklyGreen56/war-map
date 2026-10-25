@@ -7,52 +7,43 @@ Live site (after setup): https://stricklygreen56.github.io/war-map/
 ## How it works
 
 - **GitHub Pages** hosts the page (`index.html`, `config.js`, `map-capture.jpg`).
-- **Firebase Firestore** stores plans (`pins`), owner changes (`owners`) and the change log (`log`).
-- **Editing** uses a passcode stored in Firestore at `admin/secret`. The site can never read it. When a lead enters it, Firebase checks it, and `firestore.rules` only accepts edits from people who entered the current passcode.
+- **Firebase Firestore** stores plans (`pins`), owner changes (`owners`), the change log (`log`), approved editors (`editors`) and pending edit requests (`requests`).
+- **Accounts:** anyone can view without signing in. To edit, a person signs in with Google or email, taps **Request edit access**, and an admin approves them on the map. `firestore.rules` only accepts edits from approved editors and admins.
+- **Admins** are listed in the `admins` collection, which can only be changed in the Firebase console.
 
-## One-time setup
+## Setup
 
-### 1. Turn on GitHub Pages
+GitHub Pages and the Firebase project are already set up. To switch on accounts:
 
-1. Open the repo on GitHub → **Settings** → **Pages**.
-2. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main**, folder **/ (root)**, then **Save**.
-3. After a minute the site is live at the link above.
+### 1. Turn on Google and email sign-in
 
-### 2. Create the Firebase project
+1. Firebase console → **Security** → **Authentication** → **Sign-in method** tab.
+2. **Add new provider** → **Google** → turn it on, pick your email as the support email → **Save**.
+3. **Add new provider** → **Email/Password** → turn on the first switch only → **Save**.
+4. (Optional) Turn **Anonymous** off. It isn't used anymore.
 
-1. Go to https://console.firebase.google.com and sign in with a Google account.
-2. Click **Create a project** (or **Add project**), name it `war-map`, and turn Google Analytics **off**. Click **Create project**.
+### 2. Publish the new rules
 
-### 3. Create the database
+Firestore → **Rules** tab → replace everything with the contents of `firestore.rules` → **Publish**.
 
-1. In the left menu: **Build** → **Firestore Database** → **Create database**.
-2. Pick a location near you (for example `nam5 (United States)`), then choose **Start in production mode** → **Create**.
-3. Open the **Rules** tab, delete everything there, paste the full contents of `firestore.rules` from this repo, and click **Publish**.
+### 3. Make yourself the admin
 
-### 4. Set the passcode
+1. Open the map, tap **Sign in**, and sign in with Google (or create an email account).
+2. The Account card shows **Your user ID**. Copy it.
+3. Firestore → **Data** → **Start collection** → Collection ID `admins` → Next.
+4. Document ID: paste your user ID. Add a field `name` (string) with your name → **Save**.
+5. Reload the map. You'll see **Edit requests** and **Editors** cards.
 
-1. In Firestore, open the **Data** tab → **Start collection**.
-2. Collection ID: `admin` → **Next**.
-3. Document ID: `secret`. Add one field: name `key`, type **string**, value = your passcode. Click **Save**.
+To add another admin, repeat step 3 with their user ID.
 
-### 5. Turn on sign-in for leads
+### 4. Clean up the old passcode (optional)
 
-1. Left menu: **Build** → **Authentication** → **Get started**.
-2. **Sign-in method** tab → **Anonymous** → turn it on → **Save**.
-3. **Settings** tab → **Authorized domains** → **Add domain** → `stricklygreen56.github.io` → **Add**.
-
-### 6. Connect the site
-
-1. Click the gear icon → **Project settings** → **General** → scroll to **Your apps** → click the web icon (`</>`).
-2. Nickname `war-map`, leave Firebase Hosting **unchecked**, click **Register app**.
-3. Copy the `firebaseConfig = { ... }` block it shows. Either send it to Claude, or paste the values into `config.js` on GitHub (open the file → pencil icon → edit → **Commit changes**).
-
-These config values are meant to be public. The passcode is what protects editing.
+Firestore → Data → delete the `admin` collection and the `editors` documents created by the passcode version.
 
 ## Everyday use
 
 - **Viewing:** share the link in Discord. No account is needed.
-- **Editing:** tap **Edit**, enter your name and the passcode. Each device remembers it until you tap **Stop editing on this device**.
-- **Changing the passcode:** in Firestore, open `admin` → `secret` and change `key`. Everyone is locked out of editing until they enter the new passcode.
-- **Undoing a mistake:** the change log on the page shows who changed what and when. Use **Back to video** on a tile to undo an owner change, or ✕ to remove a plan.
+- **Getting edit access:** sign in → **Request edit access**. An admin taps **Approve** under Edit requests.
+- **Removing someone:** under Editors, tap **Remove**. They can still view.
+- **Undoing a mistake:** the change log shows who changed what and when. Use **Back to video** on a tile to undo an owner change, or ✕ to remove a plan.
 - **Resetting all owner changes:** in Firestore, delete the `owners` collection.

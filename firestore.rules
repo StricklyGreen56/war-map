@@ -2,30 +2,42 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // The passcode lives in admin/secret, which nobody can read through the site.
-    function secret() {
-      return get(/databases/$(database)/documents/admin/secret).data.key;
+    function signedIn() { return request.auth != null; }
+    // Admins are listed in the `admins` collection, which can only be changed in the Firebase console.
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
-    // A lead is someone who entered the current passcode. Changing the passcode
-    // in admin/secret locks everyone out until they enter the new one.
+    // Editors are people an admin approved on the map.
     function isEditor() {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/editors/$(request.auth.uid))
-        && get(/databases/$(database)/documents/editors/$(request.auth.uid)).data.key == secret();
+      return signedIn() && (isAdmin()
+        || exists(/databases/$(database)/documents/editors/$(request.auth.uid)));
     }
     function str(v, max) { return v is string && v.size() <= max; }
 
-    match /admin/{doc} {
-      allow read, write: if false;
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Anyone signed in can ask for edit access; only admins see the list.
+    match /requests/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'at'])
+        && str(request.resource.data.name, 24)
+        && str(request.resource.data.email, 120)
+        && request.resource.data.at is number;
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
     }
 
     match /editors/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['key', 'name', 'at'])
-        && request.resource.data.key == secret()
-        && str(request.resource.data.name, 24);
-      allow delete: if false;
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['name', 'at', 'by'])
+        && str(request.resource.data.name, 24)
+        && str(request.resource.data.by, 24)
+        && request.resource.data.at is number;
+      allow delete: if isAdmin();
     }
 
     match /pins/{id} {
@@ -58,6 +70,11 @@ service cloud.firestore {
         && str(request.resource.data.name, 24)
         && request.resource.data.at is number;
       allow update, delete: if false;
+    }
+
+    // Anything else (including the old passcode) is closed.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -62,7 +62,7 @@ dt{color:var(--muted)}dd{margin:0;font-weight:500}
 .tag{font-family:var(--f-mono);font-size:.8rem;padding:1px 6px;border-radius:4px;color:#111;display:inline-block}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .field{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
-select,input[type=text],textarea{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%}
+select,input[type=text],input[type=password],textarea{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%}
 textarea{resize:vertical;min-height:60px}
 .btn{border:0;border-radius:7px;padding:8px 14px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer}
 .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
@@ -127,7 +127,7 @@ svg.z1 .z-name{display:inline}
       <button id="f-S" aria-pressed="false">Steelstory</button>
     </div>
     <label class="chk"><input type="checkbox" id="f-open"> Unclaimed only</label>
-    <button class="btn edit" id="editbtn">Edit</button>
+    <button class="btn edit" id="editbtn">Sign in</button>
   </div>
 </header>
 
@@ -154,17 +154,37 @@ svg.z1 .z-name{display:inline}
   </div>
 
   <aside>
-    <section class="card" id="unlock" hidden>
-      <h2>Lead editing</h2>
-      <form class="unlock" id="unlockform">
-        <label class="field">Your name on plans<input type="text" id="u-name" maxlength="24" placeholder="e.g. Green" autocomplete="nickname"></label>
-        <label class="field">Passcode<input type="password" id="u-key" maxlength="64" autocomplete="current-password"></label>
-        <div class="row"><button class="btn" type="submit" id="u-go">Start editing</button><span class="status" id="u-msg"></span></div>
-      </form>
-      <div id="u-on" hidden>
-        <p class="empty" id="u-who"></p>
-        <div class="row" style="margin-top:10px"><button class="btn ghost" id="u-stop">Stop editing on this device</button></div>
+    <section class="card" id="acct" hidden>
+      <h2>Account</h2>
+      <div id="a-out">
+        <button class="btn" id="a-google" type="button" style="width:100%">Sign in with Google</button>
+        <p class="note" style="text-align:center">or use email</p>
+        <form class="unlock" id="a-form">
+          <label class="field">Email<input type="text" inputmode="email" id="a-email" maxlength="120" autocomplete="email"></label>
+          <label class="field">Password<input type="password" id="a-pass" maxlength="64" autocomplete="current-password"></label>
+          <label class="field" id="a-name-wrap" hidden>Name shown on plans<input type="text" id="a-name" maxlength="24" placeholder="e.g. Green"></label>
+          <div class="row">
+            <button class="btn" type="submit" id="a-go">Sign in</button>
+            <button class="btn ghost" type="button" id="a-mode">Create account</button>
+          </div>
+          <button class="btn ghost" type="button" id="a-reset" style="align-self:flex-start;border:0;padding:4px 0;color:var(--accent)">Forgot password?</button>
+        </form>
       </div>
+      <div id="a-in" hidden>
+        <p class="empty" id="a-who"></p>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="a-request" hidden>Request edit access</button>
+          <button class="btn ghost" id="a-signout">Sign out</button>
+        </div>
+        <p class="note">Your user ID: <code id="a-uid" style="font-family:var(--f-mono);user-select:all;overflow-wrap:anywhere"></code></p>
+      </div>
+      <p class="status" id="a-msg"></p>
+    </section>
+    <section class="card" id="admin" hidden>
+      <h2>Edit requests</h2>
+      <ul class="pins" id="reqlist"></ul>
+      <h2 style="margin-top:16px">Editors</h2>
+      <ul class="pins" id="edlist"></ul>
     </section>
     <section class="card" id="detail">
       <h2>Tile</h2>
@@ -232,8 +252,7 @@ const tileName = t => t.kind==="temple"?"Temple":t.kind==="mine"?"Mine":TYPE[t.t
 // ---------- Shared state ----------
 let overrides = {};   // id -> guild ("" = unclaimed)
 let pins = [];        // {id, tile, kind, text, by, at}
-let fs=null, auth=null, canWrite=false, myName="", logs=[];
-try{ myName=localStorage.getItem("wm-name")||""; }catch(e){}
+let fs=null, auth=null, canWrite=false, myName="", logs=[], me=null, isAdmin=false, editors={}, requests=[], creating=false;
 const ownerOf = id => (id in overrides) ? overrides[id] : (baseOwner[id]||"");
 function gColor(g){ if(GCOLOR[g]) return GCOLOR[g]; let h=0; for(const ch of g) h=(h*31+ch.charCodeAt(0))%360; return `hsl(${h} 70% 62%)`; }
 
@@ -393,7 +412,7 @@ function renderDetail(){
        <label class="field" style="flex:0 0 130px">Type<select id="pin-kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}">${v[0]}</option>`).join("")}</select></label>
      </div>
      <label class="field">Plan<textarea id="pin-text" maxlength="200" placeholder="e.g. Hit at reset, all PLR rally here"></textarea></label>
-     <div class="row"><button class="btn" type="submit" ${canWrite?"":"disabled"}>Add plan</button><span class="status" id="pinmsg">${canWrite?"":"Tap Edit at the top and enter the passcode to add plans."}</span></div>
+     <div class="row"><button class="btn" type="submit" ${canWrite?"":"disabled"}>Add plan</button><span class="status" id="pinmsg">${canWrite?"":"Sign in and get approved by a lead to add plans."}</span></div>
    </form>`;
   const sel=document.getElementById("own-sel"), nw=document.getElementById("own-new");
   sel.onchange=()=>{ if(sel.value==="__new"){ nw.hidden=false; nw.focus(); return;} nw.hidden=true; setOwner(t.id, sel.value); };
@@ -433,34 +452,81 @@ document.getElementById("beltlegend").innerHTML=BELTS.map(b=>`<span><i style="ba
 const status=m=>document.getElementById("dbstatus").textContent=m;
 const $=id=>document.getElementById(id);
 const tileCoord=id=>coord(tiles.find(t=>t.id===id));
+const amsg=m=>$("a-msg").textContent=m;
 async function addLog(text){ if(!fs) return; try{ await fs.collection("log").add({text:text.slice(0,200),name:myName.slice(0,24),at:Date.now()}); }catch(e){} }
 async function setOwner(id,g){ if(!fs||!canWrite) return; try{ await fs.doc("owners/"+id).set({guild:g.slice(0,8),name:myName,at:Date.now()}); addLog(`set ${tileCoord(id)} to ${g||"Unclaimed"}`); }catch(e){ writeFail(e); } }
 async function resetOwner(id){ if(!fs||!canWrite) return; try{ await fs.doc("owners/"+id).delete(); addLog(`reset ${tileCoord(id)} to the video holdings`); }catch(e){ writeFail(e); } }
 async function addPin(tile,kind,text){ if(!text){ $("pinmsg").textContent="Write the plan first."; return; } if(!fs||!canWrite) return;
   try{ await fs.collection("pins").add({tile,kind,text:text.slice(0,200),name:myName,at:Date.now()}); $("pin-text").value=""; addLog(`added ${KINDS[kind][0]} on ${tileCoord(tile)}: ${text}`); }catch(e){ writeFail(e); } }
 async function delPin(id){ if(!fs||!canWrite) return; const p=pins.find(x=>x.id===id); try{ await fs.doc("pins/"+id).delete(); if(p) addLog(`removed a plan on ${tileCoord(p.tile)}: ${p.text}`); }catch(e){ writeFail(e); } }
-function writeFail(e){ if(e&&e.code==="permission-denied"){ setEditor(false); status("Your edit access ended, probably because the passcode changed. Tap Edit and enter the new one."); } else status("Couldn't save just now. Check your connection and try again."); }
+function writeFail(e){ if(e&&e.code==="permission-denied"){ status("You don't have edit access right now. Ask a lead to approve you."); refreshAccess(); } else status("Couldn't save just now. Check your connection and try again."); }
 
-function setEditor(on){ canWrite=on; $("editbtn").textContent=on?`Editing as ${myName||"lead"}`:"Edit";
-  $("unlockform").hidden=on; $("u-on").hidden=!on; $("u-who").textContent=on?`You're editing as ${myName}. Plans and owner changes you make are saved for everyone.`:"";
-  renderAll(); }
-$("editbtn").onclick=()=>{ const c=$("unlock"); c.hidden=!c.hidden; if(!c.hidden){ $("u-name").value=myName; (myName?$("u-key"):$("u-name")).focus(); } };
-$("unlockform").onsubmit=async e=>{ e.preventDefault();
-  const name=$("u-name").value.trim(), key=$("u-key").value;
-  if(!name||!key){ $("u-msg").textContent="Enter your name and the passcode."; return; }
-  if(!fs){ $("u-msg").textContent="Shared plans aren't connected yet."; return; }
-  $("u-go").disabled=true; $("u-msg").textContent="Checking…";
+// ----- Access -----
+let unsubReq=null;
+function refreshAccess(){
+  const uid=me&&me.uid;
+  const ed = uid ? editors[uid] : null;
+  canWrite = !!(uid && (isAdmin || ed));
+  myName = (ed&&ed.name) || (me&&me.displayName) || (me&&me.email&&me.email.split("@")[0]) || ""; myName=myName.slice(0,24);
+  $("editbtn").textContent = !me ? "Sign in" : canWrite ? `Editing as ${myName}` : (me.displayName||"Account");
+  $("a-out").hidden=!!me; $("a-in").hidden=!me;
+  if(me){
+    $("a-uid").textContent=me.uid;
+    const pending = requests.some(r=>r.id===me.uid) || myRequest;
+    $("a-who").textContent = isAdmin ? `Signed in as ${myName}. You're an admin: you can edit and approve leads.`
+      : canWrite ? `Signed in as ${myName}. You can add plans and change owners.`
+      : pending ? `Signed in as ${myName}. Your edit request is waiting for approval.`
+      : `Signed in as ${myName}. You can view the map. Request edit access to add plans.`;
+    $("a-request").hidden = canWrite || pending;
+  }
+  $("admin").hidden=!isAdmin; renderAdmin(); renderAll();
+}
+let myRequest=false;
+function renderAdmin(){
+  if(!isAdmin) return;
+  $("reqlist").innerHTML = requests.length ? requests.map(r=>`<li style="cursor:default;grid-template-columns:1fr auto"><span class="t"><b>${esc(r.name||"Someone")}</b><br><span class="m" style="grid-column:auto">${esc(r.email||"")} · ${esc(whenTxt(r.at))}</span></span><span class="row"><button class="btn" data-ok="${esc(r.id)}">Approve</button><button class="btn ghost" data-no="${esc(r.id)}">Deny</button></span></li>`).join("") : '<li style="cursor:default;display:block" class="empty">No requests right now.</li>';
+  const eds=Object.entries(editors);
+  $("edlist").innerHTML = eds.length ? eds.map(([id,e])=>`<li style="cursor:default;grid-template-columns:1fr auto"><span class="t"><b>${esc(e.name||"Lead")}</b><br><span class="m" style="grid-column:auto">Approved ${esc(whenTxt(e.at))}</span></span><button class="btn ghost" data-rm="${esc(id)}">Remove</button></li>`).join("") : '<li style="cursor:default;display:block" class="empty">No approved editors yet.</li>';
+  $("reqlist").querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>approve(b.dataset.ok));
+  $("reqlist").querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>deny(b.dataset.no));
+  $("edlist").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeEditor(b.dataset.rm));
+}
+async function approve(id){ const r=requests.find(x=>x.id===id); if(!r) return;
+  try{ const b=fs.batch(); b.set(fs.doc("editors/"+id),{name:(r.name||"Lead").slice(0,24),at:Date.now(),by:myName.slice(0,24)}); b.delete(fs.doc("requests/"+id)); await b.commit(); addLog(`approved ${r.name||"a lead"} as an editor`); }catch(e){ amsg("Couldn't approve. Check that your admin entry is set up."); } }
+async function deny(id){ const r=requests.find(x=>x.id===id); try{ await fs.doc("requests/"+id).delete(); }catch(e){ amsg("Couldn't remove that request."); } }
+async function removeEditor(id){ const e=editors[id]; try{ await fs.doc("editors/"+id).delete(); addLog(`removed ${e&&e.name||"a lead"} as an editor`); }catch(err){ amsg("Couldn't remove that editor."); } }
+
+// ----- Sign-in UI -----
+$("editbtn").onclick=()=>{ const c=$("acct"); c.hidden=!c.hidden; if(!c.hidden) c.scrollIntoView({block:"nearest"}); };
+function authErr(e){ const c=e&&e.code||"";
+  return c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found") ? "Email or password is wrong."
+    : c.includes("email-already-in-use") ? "That email already has an account. Sign in instead."
+    : c.includes("weak-password") ? "Use a password with at least 6 characters."
+    : c.includes("invalid-email") ? "That email address doesn't look right."
+    : c.includes("operation-not-allowed") ? "This sign-in method isn't turned on in Firebase yet."
+    : c.includes("unauthorized-domain") ? "This site's address isn't on Firebase's authorized domains list."
+    : c.includes("popup-closed") || c.includes("cancelled-popup") ? ""
+    : "Couldn't sign in. Try again."; }
+$("a-google").onclick=async()=>{ if(!auth) return amsg("Shared plans aren't connected yet."); amsg("");
+  const prov=new firebase.auth.GoogleAuthProvider();
+  try{ await auth.signInWithPopup(prov); }catch(e){ if(e&&e.code==="auth/popup-blocked"){ try{ await auth.signInWithRedirect(prov); }catch(e2){ amsg(authErr(e2)); } } else amsg(authErr(e)); } };
+$("a-mode").onclick=()=>{ creating=!creating; $("a-name-wrap").hidden=!creating; $("a-go").textContent=creating?"Create account":"Sign in"; $("a-mode").textContent=creating?"I have an account":"Create account"; $("a-pass").autocomplete=creating?"new-password":"current-password"; amsg(""); };
+$("a-form").onsubmit=async e=>{ e.preventDefault(); if(!auth) return amsg("Shared plans aren't connected yet.");
+  const email=$("a-email").value.trim(), pass=$("a-pass").value, name=$("a-name").value.trim();
+  if(!email||!pass) return amsg("Enter your email and password.");
+  if(creating&&!name) return amsg("Enter the name you want on your plans.");
+  $("a-go").disabled=true; amsg(creating?"Creating your account…":"Signing in…");
   try{
-    if(!auth.currentUser) await auth.signInAnonymously();
-    await fs.doc("editors/"+auth.currentUser.uid).set({key,name,at:Date.now()});
-    myName=name; try{ localStorage.setItem("wm-name",name); }catch(e){}
-    $("u-key").value=""; $("u-msg").textContent=""; setEditor(true);
-  }catch(err){
-    $("u-msg").textContent = err&&err.code==="permission-denied" ? "That passcode didn't work." :
-      (err&&String(err.code).startsWith("auth/")) ? "Sign-in is off. Turn on Anonymous sign-in in Firebase (see the setup guide)." : "Couldn't connect. Try again.";
-  } finally { $("u-go").disabled=false; }
-};
-$("u-stop").onclick=async()=>{ try{ await auth.signOut(); }catch(e){} setEditor(false); };
+    if(creating){ const c=await auth.createUserWithEmailAndPassword(email,pass); await c.user.updateProfile({displayName:name}); me=auth.currentUser; }
+    else await auth.signInWithEmailAndPassword(email,pass);
+    $("a-pass").value=""; amsg(""); refreshAccess();
+  }catch(err){ amsg(authErr(err)); } finally{ $("a-go").disabled=false; } };
+$("a-reset").onclick=async()=>{ const email=$("a-email").value.trim(); if(!email) return amsg("Type your email above first, then tap Forgot password.");
+  try{ await auth.sendPasswordResetEmail(email); amsg("Check your email for a link to reset your password."); }catch(e){ amsg(authErr(e)); } };
+$("a-signout").onclick=async()=>{ try{ await auth.signOut(); }catch(e){} };
+$("a-request").onclick=async()=>{ if(!me) return;
+  try{ await fs.doc("requests/"+me.uid).set({name:(myName||"Lead").slice(0,24),email:(me.email||"").slice(0,120),at:Date.now()}); myRequest=true; refreshAccess(); amsg("Request sent. You'll be able to edit as soon as an admin approves it."); }
+  catch(e){ amsg("Couldn't send the request. Try again."); } };
 
 function renderLog(){ const ol=$("log");
   ol.innerHTML = logs.length ? logs.map(l=>`<li><time>${esc(whenTxt(l.at))}</time><span><b>${esc(l.name||"A lead")}</b> ${esc(l.text)}</span></li>`).join("") : '<li><span></span><span class="empty">No changes yet.</span></li>'; }
@@ -470,12 +536,21 @@ drawAxes(); renderAll(); applyVB();
   const cfg=window.FIREBASE_CONFIG;
   if(!window.firebase||!cfg||!cfg.apiKey||cfg.apiKey.startsWith("PASTE")){ status("Shared plans aren't connected yet. The map works; plans appear once Firebase is set up."); return; }
   firebase.initializeApp(cfg); fs=firebase.firestore(); auth=firebase.auth();
+  auth.getRedirectResult().catch(e=>amsg(authErr(e)));
   const lost=()=>status("Lost the live connection. Reload to reconnect.");
   fs.collection("owners").onSnapshot(s=>{ const o={}; s.docs.forEach(d=>{ o[d.id]=d.data().guild||""; }); overrides=o; renderAll(); }, lost);
   fs.collection("pins").onSnapshot(s=>{ pins=s.docs.map(d=>({id:d.id,...d.data()})); status("Live. Anyone with the link sees changes as they happen."); renderAll(); }, lost);
   fs.collection("log").orderBy("at","desc").limit(40).onSnapshot(s=>{ logs=s.docs.map(d=>d.data()); renderLog(); }, ()=>{});
-  auth.onAuthStateChanged(async u=>{ if(!u){ if(canWrite) setEditor(false); return; }
-    try{ const d=await fs.doc("editors/"+u.uid).get(); if(d.exists){ if(!myName) myName=d.data().name||""; setEditor(true); } }catch(e){ setEditor(false); } });
+  fs.collection("editors").onSnapshot(s=>{ const e={}; s.docs.forEach(d=>{ e[d.id]=d.data(); }); editors=e; refreshAccess(); }, ()=>{});
+  auth.onAuthStateChanged(async u=>{
+    me=u; isAdmin=false; myRequest=false; requests=[]; if(unsubReq){ unsubReq(); unsubReq=null; }
+    if(u){
+      try{ isAdmin=(await fs.doc("admins/"+u.uid).get()).exists; }catch(e){}
+      try{ myRequest=(await fs.doc("requests/"+u.uid).get()).exists; }catch(e){}
+      if(isAdmin) unsubReq=fs.collection("requests").onSnapshot(s=>{ requests=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.at-b.at); refreshAccess(); }, ()=>{});
+    }
+    refreshAccess();
+  });
 })();
 </script>
 </body>
