@@ -1,12 +1,10 @@
 // Firebase connection for the war map.
-// Replace this whole object with the firebaseConfig block from your Firebase project
-// (Project settings → General → Your apps → SDK setup and configuration → Config).
-// These values are meant to be public; the passcode is what protects editing.
+// These values are meant to be public; the passcode stored in Firestore protects editing.
 window.FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyB6p_MOSoYNMvSFJ7y7ynJYWV1qygtFueY",
+  authDomain: "war-map-74ecc.firebaseapp.com",
+  projectId: "war-map-74ecc",
+  storageBucket: "war-map-74ecc.firebasestorage.app",
+  messagingSenderId: "991624231725",
+  appId: "1:991624231725:web:6c3ac6632cb0c633bc31a4"
 };
