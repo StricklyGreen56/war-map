@@ -172,6 +172,10 @@ svg.z1 .z-name{display:inline}
       </div>
       <div id="a-in" hidden>
         <p class="empty" id="a-who"></p>
+        <form class="row" id="n-form" style="margin-top:10px;align-items:flex-end">
+          <label class="field" style="flex:1;min-width:140px">Name shown on the map<input type="text" id="n-name" maxlength="24" placeholder="e.g. Green"></label>
+          <button class="btn ghost" type="submit">Save name</button>
+        </form>
         <div class="row" style="margin-top:10px">
           <button class="btn" id="a-request" hidden>Request edit access</button>
           <button class="btn ghost" id="a-signout">Sign out</button>
@@ -467,11 +471,12 @@ function refreshAccess(){
   const uid=me&&me.uid;
   const ed = uid ? editors[uid] : null;
   canWrite = !!(uid && (isAdmin || ed));
-  myName = (ed&&ed.name) || (me&&me.displayName) || (me&&me.email&&me.email.split("@")[0]) || ""; myName=myName.slice(0,24);
+  myName = (me&&me.displayName) || (ed&&ed.name) || (me&&me.email&&me.email.split("@")[0]) || ""; myName=myName.slice(0,24);
   $("editbtn").textContent = !me ? "Sign in" : canWrite ? `Editing as ${myName}` : (me.displayName||"Account");
   $("a-out").hidden=!!me; $("a-in").hidden=!me;
   if(me){
     $("a-uid").textContent=me.uid;
+    if(document.activeElement!==$("n-name")) $("n-name").value=myName;
     const pending = requests.some(r=>r.id===me.uid) || myRequest;
     $("a-who").textContent = isAdmin ? `Signed in as ${myName}. You're an admin: you can edit and approve leads.`
       : canWrite ? `Signed in as ${myName}. You can add plans and change owners.`
@@ -523,6 +528,9 @@ $("a-form").onsubmit=async e=>{ e.preventDefault(); if(!auth) return amsg("Share
   }catch(err){ amsg(authErr(err)); } finally{ $("a-go").disabled=false; } };
 $("a-reset").onclick=async()=>{ const email=$("a-email").value.trim(); if(!email) return amsg("Type your email above first, then tap Forgot password.");
   try{ await auth.sendPasswordResetEmail(email); amsg("Check your email for a link to reset your password."); }catch(e){ amsg(authErr(e)); } };
+$("n-form").onsubmit=async e=>{ e.preventDefault(); const n=$("n-name").value.trim().slice(0,24); if(!me||!n) return amsg("Type the name you want people to see.");
+  try{ await me.updateProfile({displayName:n}); if(myRequest) await fs.doc("requests/"+me.uid).set({name:n,email:(me.email||"").slice(0,120),at:Date.now()}); refreshAccess(); amsg(`Saved. Your plans and changes now show as ${n}.`); }
+  catch(err){ amsg("Couldn't save your name. Try again."); } };
 $("a-signout").onclick=async()=>{ try{ await auth.signOut(); }catch(e){} };
 $("a-request").onclick=async()=>{ if(!me) return;
   try{ await fs.doc("requests/"+me.uid).set({name:(myName||"Lead").slice(0,24),email:(me.email||"").slice(0,120),at:Date.now()}); myRequest=true; refreshAccess(); amsg("Request sent. You'll be able to edit as soon as an admin approves it."); }
