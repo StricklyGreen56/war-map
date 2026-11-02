@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Guild Schedule · Server 267</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#eef1f7; --panel:#ffffff; --ink:#18213a; --muted:#5b6682; --line:#d5dbe8;
+  --accent:#2f6fe4; --accent-ink:#ffffff; --sel:#ffb020; --cell:#e6eaf3; --heat:47,111,228;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e1424; --panel:#151d31; --ink:#e6ebf7; --muted:#97a2be; --line:#27324c;
+  --accent:#5b8ff0; --accent-ink:#0b1222; --sel:#ffc24a; --cell:#1c2640; --heat:91,143,240; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;
+  padding:12px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
+[hidden]{display:none!important}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;justify-content:space-between}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:1.9rem;letter-spacing:.02em;margin:0;line-height:1}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:.85rem}
+.srv{font-family:var(--f-mono);font-size:.78rem;color:var(--accent)}
+.clock{font-family:var(--f-mono);font-size:.85rem}
+.top{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+a.btn{text-decoration:none;display:inline-block}
+.btn{border:0;border-radius:7px;padding:8px 14px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.up{font-family:var(--f-display);letter-spacing:.06em;text-transform:uppercase}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;align-items:start}
+aside{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{font-family:var(--f-display);font-weight:700;font-size:1.05rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:7px 12px;cursor:pointer;font-family:var(--f-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.85rem;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.field{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
+input[type=text],input[type=password]{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%}
+.note{font-size:.8rem;color:var(--muted);margin:8px 0 0}
+.status{font-size:.8rem;color:var(--muted)}
+.empty{color:var(--muted);font-size:.9rem;margin:0}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.list li{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.list .m{font-size:.75rem;color:var(--muted)}
+.list li.go{cursor:pointer}.list li.go:hover{border-color:var(--accent)}
+.names{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;padding:0;list-style:none}
+.names li{font-size:.85rem;padding:2px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line)}
+.names.yes li{border-color:rgba(var(--heat),.6);background:rgba(var(--heat),.15)}
+/* Grid */
+.gridwrap{overflow-x:auto}
+.grid{display:grid;grid-template-columns:52px repeat(7,minmax(38px,1fr));gap:2px;min-width:330px;user-select:none;-webkit-user-select:none}
+.grid.painting{touch-action:none}
+.dh{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-align:center;font-size:.85rem;color:var(--muted);padding:4px 0;position:sticky;top:0;background:var(--panel);z-index:1}
+.dh.today{color:var(--accent)}
+.hl{font-family:var(--f-mono);font-size:.72rem;text-align:right;padding-right:6px;line-height:1.05;display:flex;flex-direction:column;justify-content:center}
+.hl small{color:var(--muted);font-size:.62rem}
+.c{height:26px;border-radius:4px;background:var(--cell);cursor:pointer;font-family:var(--f-mono);font-size:.7rem;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.c.now{box-shadow:inset 0 0 0 2px var(--sel)}
+.c.sel{outline:2px solid var(--ink);outline-offset:-1px}
+.c.mine{background:var(--accent);color:var(--accent-ink)}
+.legend{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+.legend i{width:18px;height:12px;border-radius:3px;display:inline-block}
+.lock{text-align:center;padding:30px 10px}
+.lock h3{font-family:var(--f-display);font-size:1.4rem;margin:0 0 6px}
+@media (max-width:820px){ main{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Guild Schedule</h1>
+    <p><span class="srv">SERVER #267 · SERVER TIME UTC-2</span> · Set the hours you're usually free each week, in server time</p>
+    <p class="clock" id="clock"></p>
+  </div>
+  <div class="top">
+    <a class="btn ghost up" href="./">War map</a>
+    <button class="btn up" id="acctbtn">Sign in</button>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <div id="locked" class="lock">
+      <h3>Guild members only</h3>
+      <p class="empty" id="lockmsg">Sign in, then request guild access. A guild admin approves each member.</p>
+      <button class="btn" id="lockgo" style="margin-top:12px">Sign in</button>
+    </div>
+    <div id="sched" hidden>
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <div class="seg" role="group" aria-label="View">
+          <button id="v-guild" aria-pressed="true">Guild</button>
+          <button id="v-mine" aria-pressed="false">My hours</button>
+        </div>
+        <span class="status" id="savemsg"></span>
+      </div>
+      <p class="note" id="hint" style="margin:0 0 10px"></p>
+      <div class="gridwrap"><div class="grid" id="grid"></div></div>
+      <div class="legend" id="legend"></div>
+      <div class="row" id="mytools" style="margin-top:10px" hidden>
+        <button class="btn ghost" id="clearmine">Clear my hours</button>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <section class="card" id="acct" hidden>
+      <h2>Account</h2>
+      <div id="a-out">
+        <button class="btn" id="a-google" type="button" style="width:100%">Sign in with Google</button>
+        <p class="note" style="text-align:center">or use email</p>
+        <form id="a-form" style="display:flex;flex-direction:column;gap:8px">
+          <label class="field">Email<input type="text" inputmode="email" id="a-email" maxlength="120" autocomplete="email"></label>
+          <label class="field">Password<input type="password" id="a-pass" maxlength="64" autocomplete="current-password"></label>
+          <div class="row">
+            <button class="btn" type="submit" id="a-go">Sign in</button>
+            <button class="btn ghost" type="button" id="a-mode">Create account</button>
+          </div>
+        </form>
+      </div>
+      <div id="a-in" hidden>
+        <p class="empty" id="a-who"></p>
+        <form id="r-form" style="margin-top:10px;display:flex;flex-direction:column;gap:8px" hidden>
+          <label class="field">Your in-game name<input type="text" id="r-name" maxlength="24" placeholder="e.g. Green"></label>
+          <button class="btn" type="submit">Request guild access</button>
+        </form>
+        <div class="row" style="margin-top:10px"><button class="btn ghost" id="a-signout">Sign out</button></div>
+        <p class="note">Your user ID: <code id="a-uid" style="font-family:var(--f-mono);user-select:all;overflow-wrap:anywhere"></code></p>
+      </div>
+      <p class="status" id="a-msg"></p>
+    </section>
+
+    <section class="card" id="detail" hidden></section>
+
+    <section class="card" id="best" hidden>
+      <h2>Best times</h2>
+      <ul class="list" id="bestlist"></ul>
+      <p class="note">The hours when the most members are free. Tap one to see who.</p>
+    </section>
+
+    <section class="card" id="missing" hidden>
+      <h2>Haven't set hours</h2>
+      <ul class="names" id="misslist"></ul>
+    </section>
+
+    <section class="card" id="admin" hidden>
+      <h2>Guild requests</h2>
+      <ul class="list" id="reqlist"></ul>
+      <h2 style="margin-top:16px">Members</h2>
+      <ul class="list" id="memlist"></ul>
+      <p class="note">Removing someone also deletes their hours. They can still view the war map.</p>
+    </section>
+  </aside>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+// ---------- Time ----------
+const SERVER_OFFSET_MIN = -120;           // game server is UTC-2
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DAYS_LONG = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const localOffsetMin = () => -new Date().getTimezoneOffset();
+function serverNow(){ const d=new Date(Date.now()+SERVER_OFFSET_MIN*60000); return {day:(d.getUTCDay()+6)%7, hour:d.getUTCHours(), min:d.getUTCMinutes()}; }
+function localLabel(h, short){ // what server hour h is in the viewer's local time
+  let m = (h*60 + localOffsetMin() - SERVER_OFFSET_MIN) % 1440; if(m<0) m+=1440;
+  const hh=Math.floor(m/60), mm=m%60, h12=(hh%12)||12, ap=hh<12?"am":"pm";
+  return short ? `${h12}${mm?":"+String(mm).padStart(2,"0"):""}${ap[0]}` : `${h12}:${String(mm).padStart(2,"0")} ${ap.toUpperCase()}`;
+}
+const hh = h => String(h).padStart(2,"0")+":00";
+const slotTxt = s => `${DAYS_LONG[Math.floor(s/24)]} ${hh(s%24)}–${hh((s%24+1)%24)}`;
+const sameAsServer = () => localOffsetMin()===SERVER_OFFSET_MIN;
+function tickClock(){ const n=serverNow();
+  $("clock").textContent = `Server time now: ${DAYS[n.day]} ${String(n.hour).padStart(2,"0")}:${String(n.min).padStart(2,"0")}` +
+    (sameAsServer() ? "" : ` · your time ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`);
+  markNow(); }
+
+// ---------- State ----------
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+let fs=null, auth=null, me=null, isAdmin=false, isMember=false, myMember=null, myRequest=null;
+let members={}, avail={}, requests=[], view="guild", selected=null, mine=new Set(), dirty=false, creating=false;
+let unsubs=[];
+const DEMO = new URLSearchParams(location.search).has("demo");
+
+const myName = () => ((myMember&&myMember.name) || (me&&me.displayName) || (me&&me.email&&me.email.split("@")[0]) || "Member").slice(0,24);
+function roster(){ // everyone who counts: approved members plus anyone with saved hours (e.g. admins)
+  const r={}; for(const [id,m] of Object.entries(members)) r[id]=m.name||"Member";
+  for(const [id,a] of Object.entries(avail)) if(!r[id]) r[id]=a.name||"Member";
+  return r; }
+function countFor(s){ let n=0; for(const a of Object.values(avail)) if(a.slots&&a.slots.includes(s)) n++; return n; }
+
+// ---------- Grid ----------
+function buildGrid(){
+  const g=$("grid"); g.textContent="";
+  g.insertAdjacentHTML("beforeend",`<div class="dh"></div>`+DAYS.map((d,i)=>`<div class="dh" data-day="${i}">${d}</div>`).join(""));
+  for(let h=0;h<24;h++){
+    g.insertAdjacentHTML("beforeend",`<div class="hl">${hh(h)}${sameAsServer()?"":`<small>${localLabel(h,true)} you</small>`}</div>`);
+    for(let d=0;d<7;d++) g.insertAdjacentHTML("beforeend",`<div class="c" data-s="${d*24+h}" role="button" aria-label="${DAYS_LONG[d]} ${hh(h)} server time"></div>`);
+  }
+}
+function paintGrid(){
+  const total=Object.keys(avail).length;
+  let max=0; const counts=[]; for(let s=0;s<168;s++){ counts[s]=countFor(s); if(counts[s]>max) max=counts[s]; }
+  $("grid").querySelectorAll(".c").forEach(c=>{ const s=+c.dataset.s;
+    c.classList.toggle("sel", view==="guild" && s===selected);
+    if(view==="mine"){ c.classList.toggle("mine",mine.has(s)); c.style.background=""; c.textContent=""; return; }
+    c.classList.remove("mine"); const n=counts[s];
+    c.style.background = n ? `rgba(var(--heat),${(0.15+0.85*n/Math.max(1,max)).toFixed(2)})` : "";
+    c.style.color = n/Math.max(1,max)>0.55 ? "#fff" : "";
+    c.textContent = n||"";
+  });
+  $("legend").innerHTML = view==="mine"
+    ? `<i style="background:var(--accent)"></i> You're usually free <i style="background:var(--cell);margin-left:8px"></i> Not free`
+    : `<span>Fewer free</span>${[.2,.45,.7,1].map(a=>`<i style="background:rgba(var(--heat),${a})"></i>`).join("")}<span>Most free</span><span style="margin-left:auto">${total} of ${Object.keys(roster()).length} members have set hours</span>`;
+  $("hint").textContent = view==="mine"
+    ? "Tap or drag across the hours you're usually free each week. Times are server time. Changes save automatically."
+    : "Numbers show how many members are free each hour (server time). Tap an hour to see who.";
+  $("mytools").hidden = view!=="mine";
+  markNow();
+}
+function markNow(){ const n=serverNow(), s=n.day*24+n.hour;
+  document.querySelectorAll(".c.now").forEach(c=>c.classList.remove("now"));
+  const c=document.querySelector(`.c[data-s="${s}"]`); if(c) c.classList.add("now");
+  document.querySelectorAll(".dh[data-day]").forEach(d=>d.classList.toggle("today",+d.dataset.day===n.day)); }
+
+// Painting my hours: the first cell decides add or remove, then drag applies it.
+let paint=null;
+const cellAt=(x,y)=>{ const e=document.elementFromPoint(x,y); return e&&e.classList&&e.classList.contains("c")?e:null; };
+$("grid").addEventListener("pointerdown",e=>{
+  const c=e.target.closest(".c"); if(!c) return; const s=+c.dataset.s;
+  if(view==="guild"){ selected=s; paintGrid(); renderDetail(); return; }
+  e.preventDefault(); paint={add:!mine.has(s)}; applyPaint(s); $("grid").setPointerCapture(e.pointerId);
+});
+$("grid").addEventListener("pointermove",e=>{ if(!paint) return; const c=cellAt(e.clientX,e.clientY); if(c) applyPaint(+c.dataset.s); });
+const endPaint=()=>{ if(!paint) return; paint=null; if(dirty) scheduleSave(); };
+$("grid").addEventListener("pointerup",endPaint); $("grid").addEventListener("pointercancel",endPaint);
+function applyPaint(s){ const had=mine.has(s); if(paint.add===had) return; paint.add?mine.add(s):mine.delete(s); dirty=true;
+  const c=document.querySelector(`.c[data-s="${s}"]`); if(c) c.classList.toggle("mine",paint.add); $("savemsg").textContent="Unsaved changes…"; }
+let saveT=null;
+function scheduleSave(){ clearTimeout(saveT); saveT=setTimeout(saveMine,700); }
+async function saveMine(){
+  const slots=[...mine].sort((a,b)=>a-b);
+  if(DEMO){ avail[me.uid]={name:myName(),slots,at:Date.now()}; dirty=false; $("savemsg").textContent="Saved (demo)"; renderSide(); return; }
+  try{ $("savemsg").textContent="Saving…";
+    if(slots.length) await fs.doc("avail/"+me.uid).set({name:myName(),slots,at:Date.now()});
+    else await fs.doc("avail/"+me.uid).delete();
+    dirty=false; $("savemsg").textContent="Saved";
+  }catch(e){ $("savemsg").textContent = e&&e.code==="permission-denied" ? "Couldn't save: you're not on the guild list anymore." : "Couldn't save. Check your connection; I'll retry when you change something."; }
+}
+$("clearmine").onclick=()=>{ if(!mine.size) return; if(!confirmClear()) return; mine.clear(); dirty=true; paintGrid(); saveMine(); };
+function confirmClear(){ const b=$("clearmine"); if(b.dataset.armed){ delete b.dataset.armed; b.textContent="Clear my hours"; return true; }
+  b.dataset.armed="1"; b.textContent="Tap again to clear all"; setTimeout(()=>{ delete b.dataset.armed; b.textContent="Clear my hours"; },3000); return false; }
+
+function setView(v){ view=v; $("v-guild").setAttribute("aria-pressed",v==="guild"); $("v-mine").setAttribute("aria-pressed",v==="mine");
+  $("grid").classList.toggle("painting",v==="mine"); paintGrid(); renderDetail(); }
+$("v-guild").onclick=()=>setView("guild"); $("v-mine").onclick=()=>setView("mine");
+
+// ---------- Side panels ----------
+function renderDetail(){
+  const box=$("detail");
+  if(view!=="guild" || selected===null || !isMember){ box.hidden=true; return; }
+  const r=roster(), free=[], busy=[], unset=[];
+  for(const [id,name] of Object.entries(r)){ const a=avail[id]; if(!a) unset.push(name); else (a.slots.includes(selected)?free:busy).push(name); }
+  const srt=a=>a.sort((x,y)=>x.localeCompare(y));
+  box.hidden=false;
+  box.innerHTML=`<h2>${esc(slotTxt(selected))}</h2>
+    <p class="status" style="margin:0">Server time${sameAsServer()?"":` · starts ${localLabel(selected%24)} your time`}</p>
+    <p style="margin:12px 0 0"><b>Free (${free.length})</b></p>${free.length?`<ul class="names yes">${srt(free).map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:'<p class="empty">Nobody yet.</p>'}
+    <p style="margin:12px 0 0"><b>Not free (${busy.length})</b></p>${busy.length?`<ul class="names">${srt(busy).map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:'<p class="empty">Nobody.</p>'}
+    ${unset.length?`<p style="margin:12px 0 0"><b>Haven't set hours (${unset.length})</b></p><ul class="names">${srt(unset).map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:""}`;
+}
+function renderBest(){
+  const total=Object.keys(avail).length; $("best").hidden=!isMember;
+  if(!isMember) return;
+  if(!total){ $("bestlist").innerHTML='<li class="empty" style="display:block">No one has set hours yet.</li>'; return; }
+  const ranked=[...Array(168).keys()].map(s=>[s,countFor(s)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]||a[0]-b[0]);
+  const picks=[]; for(const [s,n] of ranked){ if(picks.length>=5) break; if(picks.some(([p])=>Math.abs(p-s)<=1)) continue; picks.push([s,n]); }
+  $("bestlist").innerHTML=picks.map(([s,n])=>`<li class="go" data-s="${s}"><span><b>${DAYS[Math.floor(s/24)]} ${hh(s%24)}</b> <span class="m">server${sameAsServer()?"":` · ${localLabel(s%24)} you`}</span></span><span class="m">${n} of ${total} free</span></li>`).join("");
+  $("bestlist").querySelectorAll("[data-s]").forEach(li=>li.onclick=()=>{ selected=+li.dataset.s; setView("guild"); document.querySelector(`.c[data-s="${selected}"]`).scrollIntoView({block:"center",behavior:"smooth"}); });
+}
+function renderMissing(){
+  const miss=Object.entries(members).filter(([id])=>!avail[id]).map(([,m])=>m.name||"Member").sort((a,b)=>a.localeCompare(b));
+  $("missing").hidden=!isMember||!miss.length;
+  $("misslist").innerHTML=miss.map(n=>`<li>${esc(n)}</li>`).join("");
+}
+function renderAdmin(){
+  $("admin").hidden=!isAdmin; if(!isAdmin) return;
+  $("reqlist").innerHTML = requests.length ? requests.map(r=>`<li><span><b>${esc(r.name||"Someone")}</b><br><span class="m">${esc(r.email||"")}</span></span><span class="row"><button class="btn" data-ok="${esc(r.id)}">Approve</button><button class="btn ghost" data-no="${esc(r.id)}">Deny</button></span></li>`).join("") : '<li class="empty" style="display:block">No requests right now.</li>';
+  const ms=Object.entries(members).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${avail[id]?"Hours set":"No hours yet"}</span></span><button class="btn ghost" data-rm="${esc(id)}">Remove</button></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
+  $("reqlist").querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>approve(b.dataset.ok));
+  $("reqlist").querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>deny(b.dataset.no));
+  $("memlist").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeMember(b.dataset.rm,b));
+}
+function renderSide(){ renderDetail(); renderBest(); renderMissing(); renderAdmin(); if(isMember) paintGrid(); }
+
+async function approve(id){ const r=requests.find(x=>x.id===id); if(!r) return;
+  if(DEMO){ members[id]={name:r.name,at:Date.now(),by:myName()}; requests=requests.filter(x=>x.id!==id); return renderSide(); }
+  try{ const b=fs.batch(); b.set(fs.doc("members/"+id),{name:(r.name||"Member").slice(0,24),at:Date.now(),by:myName()}); b.delete(fs.doc("guildRequests/"+id)); await b.commit(); }
+  catch(e){ amsg("Couldn't approve. Check that the new rules are published."); } }
+async function deny(id){ if(DEMO){ requests=requests.filter(x=>x.id!==id); return renderSide(); }
+  try{ await fs.doc("guildRequests/"+id).delete(); }catch(e){ amsg("Couldn't remove that request."); } }
+async function removeMember(id,btn){
+  if(!btn.dataset.armed){ btn.dataset.armed="1"; btn.textContent="Tap to confirm"; setTimeout(()=>{ delete btn.dataset.armed; btn.textContent="Remove"; },3000); return; }
+  if(DEMO){ delete members[id]; delete avail[id]; return renderSide(); }
+  try{ const b=fs.batch(); b.delete(fs.doc("members/"+id)); b.delete(fs.doc("avail/"+id)); await b.commit(); }
+  catch(e){ amsg("Couldn't remove that member."); } }
+
+// ---------- Access ----------
+const amsg=m=>$("a-msg").textContent=m;
+function refreshAccess(){
+  isMember = !!(me && (isAdmin || myMember));
+  $("acctbtn").textContent = !me ? "Sign in" : myName();
+  $("a-out").hidden=!!me; $("a-in").hidden=!me;
+  $("locked").hidden=isMember; $("sched").hidden=!isMember;
+  if(me){
+    $("a-uid").textContent=me.uid;
+    $("a-who").textContent = isAdmin ? `Signed in as ${myName()}. You're an admin: you approve guild members.`
+      : myMember ? `Signed in as ${myMember.name}. You're on the guild list.`
+      : myRequest ? `Signed in. Your request as "${myRequest.name}" is waiting for an admin to approve it.`
+      : `Signed in. Request guild access to see and set availability.`;
+    $("r-form").hidden = isMember || !!myRequest;
+    if(!$("r-name").value) $("r-name").value=(me.displayName||"").slice(0,24);
+  }
+  $("lockmsg").textContent = !me ? "Sign in, then request guild access. A guild admin approves each member."
+    : myRequest ? "Your request is waiting for approval. This page unlocks as soon as an admin approves you."
+    : "Request guild access with your in-game name. A guild admin approves each member.";
+  $("lockgo").textContent = !me ? "Sign in" : myRequest ? "View account" : "Request access";
+  if(isMember && !dirty){ const a=avail[me.uid]; mine=new Set(a?a.slots:[]); }
+  renderSide();
+}
+const openAcct=()=>{ const c=$("acct"); c.hidden=false; c.scrollIntoView({block:"nearest",behavior:"smooth"}); };
+$("acctbtn").onclick=()=>{ const c=$("acct"); c.hidden=!c.hidden; if(!c.hidden) c.scrollIntoView({block:"nearest"}); };
+$("lockgo").onclick=openAcct;
+
+function stopListening(){ unsubs.forEach(u=>u()); unsubs=[]; }
+function listenGuild(){ // only called once the rules let this person read the guild data
+  stopListening();
+  unsubs.push(fs.collection("members").onSnapshot(s=>{ const m={}; s.docs.forEach(d=>m[d.id]=d.data()); members=m; renderSide(); }, ()=>{}));
+  unsubs.push(fs.collection("avail").onSnapshot(s=>{ const a={}; s.docs.forEach(d=>a[d.id]=d.data()); avail=a;
+    if(!dirty && me){ const x=a[me.uid]; mine=new Set(x?x.slots:[]); } renderSide(); }, ()=>{}));
+  if(isAdmin) unsubs.push(fs.collection("guildRequests").onSnapshot(s=>{ requests=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.at-b.at); renderAdmin(); }, ()=>{}));
+}
+
+// ---------- Sign-in ----------
+function authErr(e){ const c=e&&e.code||"";
+  return c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found") ? "Email or password is wrong."
+    : c.includes("email-already-in-use") ? "That email already has an account. Sign in instead."
+    : c.includes("weak-password") ? "Use a password with at least 6 characters."
+    : c.includes("invalid-email") ? "That email address doesn't look right."
+    : c.includes("popup-closed")||c.includes("cancelled-popup") ? "" : "Couldn't sign in. Try again."; }
+$("a-google").onclick=async()=>{ if(!auth) return; amsg(""); const p=new firebase.auth.GoogleAuthProvider();
+  try{ await auth.signInWithPopup(p); }catch(e){ if(e&&e.code==="auth/popup-blocked"){ try{ await auth.signInWithRedirect(p); }catch(e2){ amsg(authErr(e2)); } } else amsg(authErr(e)); } };
+$("a-mode").onclick=()=>{ creating=!creating; $("a-go").textContent=creating?"Create account":"Sign in"; $("a-mode").textContent=creating?"I have an account":"Create account"; amsg(""); };
+$("a-form").onsubmit=async e=>{ e.preventDefault(); if(!auth) return; const email=$("a-email").value.trim(), pass=$("a-pass").value;
+  if(!email||!pass) return amsg("Enter your email and password.");
+  $("a-go").disabled=true;
+  try{ creating ? await auth.createUserWithEmailAndPassword(email,pass) : await auth.signInWithEmailAndPassword(email,pass); $("a-pass").value=""; amsg(""); }
+  catch(err){ amsg(authErr(err)); } finally{ $("a-go").disabled=false; } };
+$("a-signout").onclick=async()=>{ try{ await auth.signOut(); }catch(e){} };
+$("r-form").onsubmit=async e=>{ e.preventDefault(); const n=$("r-name").value.trim().slice(0,24); if(!n) return amsg("Enter your in-game name so the admin knows who you are.");
+  try{ const r={name:n,email:(me.email||"").slice(0,120),at:Date.now()}; await fs.doc("guildRequests/"+me.uid).set(r); myRequest=r; refreshAccess(); amsg("Request sent. This page unlocks once an admin approves you."); }
+  catch(err){ amsg("Couldn't send the request. Try again."); } };
+
+// ---------- Start ----------
+buildGrid(); tickClock(); setInterval(tickClock,30000);
+if(DEMO){
+  const N=["Green","Darwin","Apophis","Kael","Mira","Rook","Vex","Juno","Talon","Sable","Orin","Pike"];
+  me={uid:"u0",displayName:"Green",email:"demo@example.com"}; isAdmin=true; myMember={name:"Green"};
+  let seed=7; const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  N.forEach((n,i)=>{ const id="u"+i; members[id]={name:n,at:0,by:"Green"}; if(i>=10) return; const sl=[];
+    for(let d=0;d<7;d++){ const st=(d>=5?14:17)+Math.floor(rnd()*4), len=3+Math.floor(rnd()*(d>=5?6:4)); if(rnd()<0.85) for(let h=st;h<Math.min(24,st+len);h++) sl.push(d*24+h); }
+    avail[id]={name:n,slots:sl,at:0}; });
+  requests=[{id:"r1",name:"Nyx",email:"nyx@example.com",at:0}];
+  refreshAccess();
+} else {
+  const cfg=window.FIREBASE_CONFIG;
+  if(window.firebase && cfg && cfg.apiKey){
+    firebase.initializeApp(cfg); fs=firebase.firestore(); auth=firebase.auth();
+    auth.getRedirectResult().catch(e=>amsg(authErr(e)));
+    let unsubMe=null;
+    auth.onAuthStateChanged(async u=>{
+      me=u; isAdmin=false; myMember=null; myRequest=null; members={}; avail={}; requests=[]; dirty=false; mine=new Set(); stopListening();
+      if(unsubMe){ unsubMe(); unsubMe=null; }
+      if(u){
+        try{ isAdmin=(await fs.doc("admins/"+u.uid).get()).exists; }catch(e){}
+        try{ const r=await fs.doc("guildRequests/"+u.uid).get(); myRequest=r.exists?r.data():null; }catch(e){}
+        // Watch my own roster entry so approval or removal takes effect without a reload.
+        unsubMe=fs.doc("members/"+u.uid).onSnapshot(d=>{ const was=!!(isAdmin||myMember); myMember=d.exists?d.data():null; if(myMember) myRequest=null;
+          const now=!!(isAdmin||myMember); if(now&&!was) listenGuild(); if(!now){ stopListening(); members={}; avail={}; } refreshAccess(); }, ()=>{});
+        if(isAdmin) listenGuild();
+      }
+      refreshAccess();
+    });
+  } else { $("lockmsg").textContent="Couldn't load the sign-in system. Reload the page."; }
+}
+</script>
+</body>
+</html>

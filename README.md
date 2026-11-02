@@ -47,3 +47,16 @@ Firestore → Data → delete the `admin` collection and the `editors` documents
 - **Removing someone:** under Editors, tap **Remove**. They can still view.
 - **Undoing a mistake:** the change log shows who changed what and when. Use **Back to video** on a tile to undo an owner change, or ✕ to remove a plan.
 - **Resetting all owner changes:** in Firestore, delete the `owners` collection.
+
+## Guild schedule (`schedule.html`)
+
+A weekly availability grid for guild members only, linked from the map's **Guild schedule** button. All times are server time (UTC-2), and each hour also shows the viewer's local time.
+
+- **Access is separate from map editing.** A person signs in, enters their in-game name, and taps **Request guild access**. An admin approves them under **Guild requests** on the schedule page. Being a map editor does not give schedule access, and the other way around.
+- **Locked by the rules, not just hidden.** `firestore.rules` only lets approved members (and admins) read the roster and everyone's hours.
+- **Members** open **My hours** and tap or drag across the hours they're usually free. Changes save automatically.
+- **Guild view** shows how many members are free each hour. Tap an hour to see who's free, who isn't, and who hasn't set hours. **Best times** lists the top hours.
+- **Removing a member** (Members list → Remove → tap again) deletes their roster entry and their hours.
+- Data: `guildRequests`, `members`, `avail` collections. To preview the page with fake data, open `schedule.html?demo`.
+
+**Setup:** publish the updated `firestore.rules` (Firestore → Rules → paste → Publish). Admins are the same `admins` collection the map uses, so nothing else is needed.
