@@ -66,6 +66,7 @@ input[type=text],input[type=password]{background:var(--bg);border:1px solid var(
 .c{height:26px;border-radius:4px;background:var(--cell);cursor:pointer;font-family:var(--f-mono);font-size:.7rem;display:flex;align-items:center;justify-content:center;color:var(--ink)}
 .c.now{box-shadow:inset 0 0 0 2px var(--sel)}
 .c.sel{outline:2px solid var(--ink);outline-offset:-1px}
+select{font:inherit}
 .c.mine{background:var(--accent);color:var(--accent-ink)}
 .legend{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);margin-top:10px;flex-wrap:wrap}
 .legend i{width:18px;height:12px;border-radius:3px;display:inline-block}
@@ -103,6 +104,8 @@ input[type=text],input[type=password]{background:var(--bg);border:1px solid var(
         </div>
         <span class="status" id="savemsg"></span>
       </div>
+      <label class="field" id="forwrap" style="margin:0 0 10px;max-width:280px" hidden>Editing hours for
+        <select id="editfor" style="background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px"></select></label>
       <p class="note" id="hint" style="margin:0 0 10px"></p>
       <div class="gridwrap"><div class="grid" id="grid"></div></div>
       <div class="legend" id="legend"></div>
@@ -157,7 +160,11 @@ input[type=text],input[type=password]{background:var(--bg);border:1px solid var(
       <ul class="list" id="reqlist"></ul>
       <h2 style="margin-top:16px">Members</h2>
       <ul class="list" id="memlist"></ul>
-      <p class="note">Removing someone also deletes their hours. They can still view the war map.</p>
+      <form id="add-form" class="row" style="margin-top:10px;align-items:flex-end">
+        <label class="field" style="flex:1;min-width:140px">Add someone without an account<input type="text" id="add-name" maxlength="24" placeholder="In-game name"></label>
+        <button class="btn ghost" type="submit">Add</button>
+      </form>
+      <p class="note">Tap <b>Set hours</b> to fill in hours for anyone. People you add here don't need to sign in. Removing someone also deletes their hours.</p>
     </section>
   </aside>
 </main>
@@ -190,7 +197,7 @@ function tickClock(){ const n=serverNow();
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 let fs=null, auth=null, me=null, isAdmin=false, isMember=false, myMember=null, myRequest=null;
-let members={}, avail={}, requests=[], view="guild", selected=null, mine=new Set(), dirty=false, creating=false;
+let members={}, avail={}, requests=[], view="guild", selected=null, mine=new Set(), dirty=false, editFor=null, creating=false;
 let unsubs=[];
 const DEMO = new URLSearchParams(location.search).has("demo");
 
@@ -199,6 +206,9 @@ function roster(){ // everyone who counts: approved members plus anyone with sav
   const r={}; for(const [id,m] of Object.entries(members)) r[id]=m.name||"Member";
   for(const [id,a] of Object.entries(avail)) if(!r[id]) r[id]=a.name||"Member";
   return r; }
+const target = () => (isAdmin && editFor) || (me && me.uid);
+const nameFor = id => id===(me&&me.uid) ? myName() : ((members[id]&&members[id].name) || (avail[id]&&avail[id].name) || "Member").slice(0,24);
+function loadMine(){ const a=avail[target()]; mine=new Set(a?a.slots:[]); }
 function countFor(s){ let n=0; for(const a of Object.values(avail)) if(a.slots&&a.slots.includes(s)) n++; return n; }
 
 // ---------- Grid ----------
@@ -222,12 +232,14 @@ function paintGrid(){
     c.textContent = n||"";
   });
   $("legend").innerHTML = view==="mine"
-    ? `<i style="background:var(--accent)"></i> You're usually free <i style="background:var(--cell);margin-left:8px"></i> Not free`
+    ? `<i style="background:var(--accent)"></i> ${target()===me.uid?"You're":esc(nameFor(target()))+" is"} usually free <i style="background:var(--cell);margin-left:8px"></i> Not free`
     : `<span>Fewer free</span>${[.2,.45,.7,1].map(a=>`<i style="background:rgba(var(--heat),${a})"></i>`).join("")}<span>Most free</span><span style="margin-left:auto">${total} of ${Object.keys(roster()).length} members have set hours</span>`;
   $("hint").textContent = view==="mine"
-    ? "Tap or drag across the hours you're usually free each week. Times are server time. Changes save automatically."
+    ? (target()!==me.uid ? `Setting hours for ${nameFor(target())}. Tap or drag across the hours they're usually free. Saves automatically.` : "Tap or drag across the hours you're usually free each week. Times are server time. Changes save automatically.")
     : "Numbers show how many members are free each hour (server time). Tap an hour to see who.";
   $("mytools").hidden = view!=="mine";
+  $("forwrap").hidden = !(view==="mine" && isAdmin);
+  if(!$("clearmine").dataset.armed) $("clearmine").textContent = target()===me.uid ? "Clear my hours" : `Clear ${nameFor(target())}'s hours`;
   markNow();
 }
 function markNow(){ const n=serverNow(), s=n.day*24+n.hour;
@@ -252,16 +264,17 @@ let saveT=null;
 function scheduleSave(){ clearTimeout(saveT); saveT=setTimeout(saveMine,700); }
 async function saveMine(){
   const slots=[...mine].sort((a,b)=>a-b);
-  if(DEMO){ avail[me.uid]={name:myName(),slots,at:Date.now()}; dirty=false; $("savemsg").textContent="Saved (demo)"; renderSide(); return; }
+  const id=target(), nm=nameFor(id);
+  if(DEMO){ if(slots.length) avail[id]={name:nm,slots,at:Date.now()}; else delete avail[id]; dirty=false; $("savemsg").textContent="Saved (demo)"; renderSide(); return; }
   try{ $("savemsg").textContent="Saving…";
-    if(slots.length) await fs.doc("avail/"+me.uid).set({name:myName(),slots,at:Date.now()});
-    else await fs.doc("avail/"+me.uid).delete();
+    if(slots.length) await fs.doc("avail/"+id).set({name:nm,slots,at:Date.now()});
+    else await fs.doc("avail/"+id).delete();
     dirty=false; $("savemsg").textContent="Saved";
-  }catch(e){ $("savemsg").textContent = e&&e.code==="permission-denied" ? "Couldn't save: you're not on the guild list anymore." : "Couldn't save. Check your connection; I'll retry when you change something."; }
+  }catch(e){ $("savemsg").textContent = e&&e.code==="permission-denied" ? "Couldn't save: no permission. If you're setting someone else's hours, publish the latest rules." : "Couldn't save. Check your connection; I'll retry when you change something."; }
 }
 $("clearmine").onclick=()=>{ if(!mine.size) return; if(!confirmClear()) return; mine.clear(); dirty=true; paintGrid(); saveMine(); };
-function confirmClear(){ const b=$("clearmine"); if(b.dataset.armed){ delete b.dataset.armed; b.textContent="Clear my hours"; return true; }
-  b.dataset.armed="1"; b.textContent="Tap again to clear all"; setTimeout(()=>{ delete b.dataset.armed; b.textContent="Clear my hours"; },3000); return false; }
+function confirmClear(){ const b=$("clearmine"); if(b.dataset.armed){ delete b.dataset.armed; paintGrid(); return true; }
+  b.dataset.armed="1"; b.textContent="Tap again to clear all"; setTimeout(()=>{ delete b.dataset.armed; paintGrid(); },3000); return false; }
 
 function setView(v){ view=v; $("v-guild").setAttribute("aria-pressed",v==="guild"); $("v-mine").setAttribute("aria-pressed",v==="mine");
   $("grid").classList.toggle("painting",v==="mine"); paintGrid(); renderDetail(); }
@@ -299,13 +312,32 @@ function renderAdmin(){
   $("admin").hidden=!isAdmin; if(!isAdmin) return;
   $("reqlist").innerHTML = requests.length ? requests.map(r=>`<li><span><b>${esc(r.name||"Someone")}</b><br><span class="m">${esc(r.email||"")}</span></span><span class="row"><button class="btn" data-ok="${esc(r.id)}">Approve</button><button class="btn ghost" data-no="${esc(r.id)}">Deny</button></span></li>`).join("") : '<li class="empty" style="display:block">No requests right now.</li>';
   const ms=Object.entries(members).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
-  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${avail[id]?"Hours set":"No hours yet"}</span></span><button class="btn ghost" data-rm="${esc(id)}">Remove</button></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
+  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${avail[id]?"Hours set":"No hours yet"}${m.manual?" · no account":""}</span></span><span class="row" style="flex-wrap:nowrap"><button class="btn ghost" data-set="${esc(id)}">Set hours</button><button class="btn ghost" data-rm="${esc(id)}">Remove</button></span></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
   $("reqlist").querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>approve(b.dataset.ok));
   $("reqlist").querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>deny(b.dataset.no));
   $("memlist").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeMember(b.dataset.rm,b));
+  $("memlist").querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>editHoursFor(b.dataset.set));
+  renderPicker();
 }
 function renderSide(){ renderDetail(); renderBest(); renderMissing(); renderAdmin(); if(isMember) paintGrid(); }
 
+function renderPicker(){
+  const sel=$("editfor"), cur=target(); if(!sel||!me) return;
+  const ids=Object.keys(roster()).filter(id=>id!==me.uid).sort((a,b)=>nameFor(a).localeCompare(nameFor(b)));
+  sel.innerHTML=`<option value="${esc(me.uid)}">Me (${esc(myName())})</option>`+ids.map(id=>`<option value="${esc(id)}">${esc(nameFor(id))}</option>`).join("");
+  sel.value=cur;
+}
+async function editHoursFor(id){
+  if(dirty){ clearTimeout(saveT); await saveMine(); }
+  editFor = id===me.uid ? null : id; loadMine(); renderPicker(); setView("mine");
+  $("sched").scrollIntoView({block:"start",behavior:"smooth"});
+}
+$("editfor").onchange=e=>editHoursFor(e.target.value);
+$("add-form").onsubmit=async e=>{ e.preventDefault(); const n=$("add-name").value.trim().slice(0,24); if(!n) return;
+  const id="m-"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  if(DEMO){ members[id]={name:n,at:Date.now(),by:myName(),manual:true}; $("add-name").value=""; return renderSide(); }
+  try{ await fs.doc("members/"+id).set({name:n,at:Date.now(),by:myName(),manual:true}); $("add-name").value=""; }
+  catch(err){ amsg("Couldn't add them. Publish the latest rules in Firebase first."); openAcct(); } };
 async function approve(id){ const r=requests.find(x=>x.id===id); if(!r) return;
   if(DEMO){ members[id]={name:r.name,at:Date.now(),by:myName()}; requests=requests.filter(x=>x.id!==id); return renderSide(); }
   try{ const b=fs.batch(); b.set(fs.doc("members/"+id),{name:(r.name||"Member").slice(0,24),at:Date.now(),by:myName()}); b.delete(fs.doc("guildRequests/"+id)); await b.commit(); }
@@ -314,7 +346,8 @@ async function deny(id){ if(DEMO){ requests=requests.filter(x=>x.id!==id); retur
   try{ await fs.doc("guildRequests/"+id).delete(); }catch(e){ amsg("Couldn't remove that request."); } }
 async function removeMember(id,btn){
   if(!btn.dataset.armed){ btn.dataset.armed="1"; btn.textContent="Tap to confirm"; setTimeout(()=>{ delete btn.dataset.armed; btn.textContent="Remove"; },3000); return; }
-  if(DEMO){ delete members[id]; delete avail[id]; return renderSide(); }
+  if(editFor===id){ editFor=null; dirty=false; }
+  if(DEMO){ delete members[id]; delete avail[id]; loadMine(); return renderSide(); }
   try{ const b=fs.batch(); b.delete(fs.doc("members/"+id)); b.delete(fs.doc("avail/"+id)); await b.commit(); }
   catch(e){ amsg("Couldn't remove that member."); } }
 
@@ -338,7 +371,7 @@ function refreshAccess(){
     : myRequest ? "Your request is waiting for approval. This page unlocks as soon as an admin approves you."
     : "Request guild access with your in-game name. A guild admin approves each member.";
   $("lockgo").textContent = !me ? "Sign in" : myRequest ? "View account" : "Request access";
-  if(isMember && !dirty){ const a=avail[me.uid]; mine=new Set(a?a.slots:[]); }
+  if(isMember && !dirty) loadMine();
   renderSide();
 }
 const openAcct=()=>{ const c=$("acct"); c.hidden=false; c.scrollIntoView({block:"nearest",behavior:"smooth"}); };
@@ -350,7 +383,7 @@ function listenGuild(){ // only called once the rules let this person read the g
   stopListening();
   unsubs.push(fs.collection("members").onSnapshot(s=>{ const m={}; s.docs.forEach(d=>m[d.id]=d.data()); members=m; renderSide(); }, ()=>{}));
   unsubs.push(fs.collection("avail").onSnapshot(s=>{ const a={}; s.docs.forEach(d=>a[d.id]=d.data()); avail=a;
-    if(!dirty && me){ const x=a[me.uid]; mine=new Set(x?x.slots:[]); } renderSide(); }, ()=>{}));
+    if(!dirty && me) loadMine(); renderSide(); }, ()=>{}));
   if(isAdmin) unsubs.push(fs.collection("guildRequests").onSnapshot(s=>{ requests=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.at-b.at); renderAdmin(); }, ()=>{}));
 }
 
@@ -392,7 +425,7 @@ if(DEMO){
     auth.getRedirectResult().catch(e=>amsg(authErr(e)));
     let unsubMe=null;
     auth.onAuthStateChanged(async u=>{
-      me=u; isAdmin=false; myMember=null; myRequest=null; members={}; avail={}; requests=[]; dirty=false; mine=new Set(); stopListening();
+      me=u; isAdmin=false; myMember=null; myRequest=null; members={}; avail={}; requests=[]; dirty=false; mine=new Set(); editFor=null; stopListening();
       if(unsubMe){ unsubMe(); unsubMe=null; }
       if(u){
         try{ isAdmin=(await fs.doc("admins/"+u.uid).get()).exists; }catch(e){}

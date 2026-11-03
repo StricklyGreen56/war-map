@@ -91,10 +91,11 @@ service cloud.firestore {
     }
 
     // The guild roster. Only members see it; a person can check their own entry.
+    // manual = added by an admin for someone without an account.
     match /members/{uid} {
       allow read: if isMember() || (signedIn() && request.auth.uid == uid);
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['name', 'at', 'by'])
+        && request.resource.data.keys().hasOnly(['name', 'at', 'by', 'manual'])
         && str(request.resource.data.name, 24)
         && str(request.resource.data.by, 24)
         && request.resource.data.at is number;
@@ -102,9 +103,10 @@ service cloud.firestore {
     }
 
     // Weekly availability. slots = hour numbers 0-167 in server time (0 = Monday 00:00).
+    // Members set their own hours; admins can set anyone's.
     match /avail/{uid} {
       allow read: if isMember();
-      allow create, update: if isMember() && request.auth.uid == uid
+      allow create, update: if ((isMember() && request.auth.uid == uid) || isAdmin())
         && request.resource.data.keys().hasOnly(['name', 'slots', 'at'])
         && str(request.resource.data.name, 24)
         && request.resource.data.slots is list
