@@ -56,6 +56,7 @@ A weekly availability grid for guild members only, linked from the map's **Guild
 - **Locked by the rules, not just hidden.** `firestore.rules` only lets approved members (and admins) read the roster and everyone's hours.
 - **Members** open **My hours** and tap or drag across the hours they're usually free. Changes save automatically.
 - **Guild view** shows how many members are free each hour. Tap an hour to see who's free, who isn't, and who hasn't set hours. **Best times** lists the top hours.
+- **Officers:** in the Members list, an admin taps **☆ Officer** to make someone an officer. Officers can set hours for anyone using the **Editing hours for** dropdown in My hours. Approving, removing and adding members stay admin-only. Admins can also tap **Set hours** on any member, or add someone without an account.
 - **Removing a member** (Members list → Remove → tap again) deletes their roster entry and their hours.
 - Data: `guildRequests`, `members`, `avail` collections. To preview the page with fake data, open `schedule.html?demo`.
 

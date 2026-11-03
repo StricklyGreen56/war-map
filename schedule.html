@@ -164,7 +164,7 @@ select{font:inherit}
         <label class="field" style="flex:1;min-width:140px">Add someone without an account<input type="text" id="add-name" maxlength="24" placeholder="In-game name"></label>
         <button class="btn ghost" type="submit">Add</button>
       </form>
-      <p class="note">Tap <b>Set hours</b> to fill in hours for anyone. People you add here don't need to sign in. Removing someone also deletes their hours.</p>
+      <p class="note">Tap <b>☆ Officer</b> to let a member set hours for others (they use the dropdown in My hours). Tap <b>Set hours</b> to fill in hours for anyone. People you add here don't need to sign in. Removing someone also deletes their hours.</p>
     </section>
   </aside>
 </main>
@@ -206,7 +206,8 @@ function roster(){ // everyone who counts: approved members plus anyone with sav
   const r={}; for(const [id,m] of Object.entries(members)) r[id]=m.name||"Member";
   for(const [id,a] of Object.entries(avail)) if(!r[id]) r[id]=a.name||"Member";
   return r; }
-const target = () => (isAdmin && editFor) || (me && me.uid);
+const isOfficer = () => !!(isAdmin || (myMember && myMember.officer));
+const target = () => (isOfficer() && editFor) || (me && me.uid);
 const nameFor = id => id===(me&&me.uid) ? myName() : ((members[id]&&members[id].name) || (avail[id]&&avail[id].name) || "Member").slice(0,24);
 function loadMine(){ const a=avail[target()]; mine=new Set(a?a.slots:[]); }
 function countFor(s){ let n=0; for(const a of Object.values(avail)) if(a.slots&&a.slots.includes(s)) n++; return n; }
@@ -238,7 +239,7 @@ function paintGrid(){
     ? (target()!==me.uid ? `Setting hours for ${nameFor(target())}. Tap or drag across the hours they're usually free. Saves automatically.` : "Tap or drag across the hours you're usually free each week. Times are server time. Changes save automatically.")
     : "Numbers show how many members are free each hour (server time). Tap an hour to see who.";
   $("mytools").hidden = view!=="mine";
-  $("forwrap").hidden = !(view==="mine" && isAdmin);
+  $("forwrap").hidden = !(view==="mine" && isOfficer());
   if(!$("clearmine").dataset.armed) $("clearmine").textContent = target()===me.uid ? "Clear my hours" : `Clear ${nameFor(target())}'s hours`;
   markNow();
 }
@@ -312,14 +313,15 @@ function renderAdmin(){
   $("admin").hidden=!isAdmin; if(!isAdmin) return;
   $("reqlist").innerHTML = requests.length ? requests.map(r=>`<li><span><b>${esc(r.name||"Someone")}</b><br><span class="m">${esc(r.email||"")}</span></span><span class="row"><button class="btn" data-ok="${esc(r.id)}">Approve</button><button class="btn ghost" data-no="${esc(r.id)}">Deny</button></span></li>`).join("") : '<li class="empty" style="display:block">No requests right now.</li>';
   const ms=Object.entries(members).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
-  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${avail[id]?"Hours set":"No hours yet"}${m.manual?" · no account":""}</span></span><span class="row" style="flex-wrap:nowrap"><button class="btn ghost" data-set="${esc(id)}">Set hours</button><button class="btn ghost" data-rm="${esc(id)}">Remove</button></span></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
+  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${m.officer?"<b>Officer</b> · ":""}${avail[id]?"Hours set":"No hours yet"}${m.manual?" · no account":""}</span></span><span class="row" style="flex-wrap:nowrap">${m.manual?"":`<button class="btn ghost" data-off="${esc(id)}" title="${m.officer?"Remove officer":"Make officer"}">${m.officer?"★ Officer":"☆ Officer"}</button>`}<button class="btn ghost" data-set="${esc(id)}">Set hours</button><button class="btn ghost" data-rm="${esc(id)}">Remove</button></span></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
   $("reqlist").querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>approve(b.dataset.ok));
   $("reqlist").querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>deny(b.dataset.no));
   $("memlist").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeMember(b.dataset.rm,b));
   $("memlist").querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>editHoursFor(b.dataset.set));
+  $("memlist").querySelectorAll("[data-off]").forEach(b=>b.onclick=()=>toggleOfficer(b.dataset.off));
   renderPicker();
 }
-function renderSide(){ renderDetail(); renderBest(); renderMissing(); renderAdmin(); if(isMember) paintGrid(); }
+function renderSide(){ renderDetail(); renderBest(); renderMissing(); renderAdmin(); if(isOfficer()) renderPicker(); if(isMember) paintGrid(); }
 
 function renderPicker(){
   const sel=$("editfor"), cur=target(); if(!sel||!me) return;
@@ -338,6 +340,9 @@ $("add-form").onsubmit=async e=>{ e.preventDefault(); const n=$("add-name").valu
   if(DEMO){ members[id]={name:n,at:Date.now(),by:myName(),manual:true}; $("add-name").value=""; return renderSide(); }
   try{ await fs.doc("members/"+id).set({name:n,at:Date.now(),by:myName(),manual:true}); $("add-name").value=""; }
   catch(err){ amsg("Couldn't add them. Publish the latest rules in Firebase first."); openAcct(); } };
+async function toggleOfficer(id){ const m=members[id]; if(!m) return; const on=!m.officer;
+  if(DEMO){ m.officer=on; return renderSide(); }
+  try{ await fs.doc("members/"+id).update({officer:on}); }catch(e){ amsg("Couldn't change officer status. Publish the latest rules in Firebase first."); openAcct(); } }
 async function approve(id){ const r=requests.find(x=>x.id===id); if(!r) return;
   if(DEMO){ members[id]={name:r.name,at:Date.now(),by:myName()}; requests=requests.filter(x=>x.id!==id); return renderSide(); }
   try{ const b=fs.batch(); b.set(fs.doc("members/"+id),{name:(r.name||"Member").slice(0,24),at:Date.now(),by:myName()}); b.delete(fs.doc("guildRequests/"+id)); await b.commit(); }
@@ -361,6 +366,7 @@ function refreshAccess(){
   if(me){
     $("a-uid").textContent=me.uid;
     $("a-who").textContent = isAdmin ? `Signed in as ${myName()}. You're an admin: you approve guild members.`
+      : myMember && myMember.officer ? `Signed in as ${myMember.name}. You're an officer: you can set hours for anyone in My hours.`
       : myMember ? `Signed in as ${myMember.name}. You're on the guild list.`
       : myRequest ? `Signed in. Your request as "${myRequest.name}" is waiting for an admin to approve it.`
       : `Signed in. Request guild access to see and set availability.`;
