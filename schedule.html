@@ -57,12 +57,15 @@ input[type=text],input[type=password]{background:var(--bg);border:1px solid var(
 .names.yes li{border-color:rgba(var(--heat),.6);background:rgba(var(--heat),.15)}
 /* Grid */
 .gridwrap{overflow-x:auto}
-.grid{display:grid;grid-template-columns:52px repeat(7,minmax(38px,1fr));gap:2px;min-width:330px;user-select:none;-webkit-user-select:none}
+.grid{display:grid;grid-template-columns:auto auto repeat(7,minmax(38px,1fr));gap:2px;min-width:330px;user-select:none;-webkit-user-select:none}
 .grid.painting{touch-action:none}
 .dh{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-align:center;font-size:.85rem;color:var(--muted);padding:4px 0;position:sticky;top:0;background:var(--panel);z-index:1}
 .dh.today{color:var(--accent)}
-.hl{font-family:var(--f-mono);font-size:.72rem;text-align:right;padding-right:6px;line-height:1.05;display:flex;flex-direction:column;justify-content:center}
-.hl small{color:var(--muted);font-size:.62rem}
+.hl{font-family:var(--f-mono);font-size:.8rem;text-align:right;padding:0 6px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap;font-weight:500}
+.hl.sec{color:var(--muted);font-size:.72rem;font-weight:400}
+.lh{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.72rem;text-align:right;padding:4px 6px;position:sticky;top:0;background:var(--panel);z-index:1;color:var(--ink)}
+.lh.sec{color:var(--muted)}
+.grid.one .hl.sec,.grid.one .lh.sec{display:none}
 .c{height:26px;border-radius:4px;background:var(--cell);cursor:pointer;font-family:var(--f-mono);font-size:.7rem;display:flex;align-items:center;justify-content:center;color:var(--ink)}
 .c.now{box-shadow:inset 0 0 0 2px var(--sel)}
 .c.sel{outline:2px solid var(--ink);outline-offset:-1px}
@@ -72,7 +75,15 @@ select{font:inherit}
 .legend i{width:18px;height:12px;border-radius:3px;display:inline-block}
 .lock{text-align:center;padding:30px 10px}
 .lock h3{font-family:var(--f-display);font-size:1.4rem;margin:0 0 6px}
-@media (max-width:820px){ main{grid-template-columns:1fr} }
+@media (max-width:820px){ main{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:520px){
+  .grid{grid-template-columns:auto auto repeat(7,minmax(28px,1fr));min-width:0}
+  .grid .mm{display:none}
+  .hl{font-size:.74rem;padding:0 3px}.hl.sec{font-size:.66rem}.lh{padding:4px 3px;font-size:.66rem}
+  .dh{font-size:.72rem;letter-spacing:.02em}
+  .c{font-size:.62rem}
+  .card{padding:12px 10px}
+}
 </style>
 </head>
 <body>
@@ -80,7 +91,7 @@ select{font:inherit}
 <header>
   <div class="brand">
     <h1>Guild Schedule</h1>
-    <p><span class="srv">SERVER #267 · SERVER TIME UTC-2</span> · Set the hours you're usually free each week, in server time</p>
+    <p><span class="srv">SERVER #267 · SERVER TIME UTC-2</span> · Set the hours you're usually free each week. Switch between server time and your own time above the grid.</p>
     <p class="clock" id="clock"></p>
   </div>
   <div class="top">
@@ -101,6 +112,10 @@ select{font:inherit}
         <div class="seg" role="group" aria-label="View">
           <button id="v-guild" aria-pressed="true">Guild</button>
           <button id="v-mine" aria-pressed="false">My hours</button>
+        </div>
+        <div class="seg" role="group" aria-label="Show times in" id="tzseg">
+          <button id="tz-server" aria-pressed="true">Server time</button>
+          <button id="tz-local" aria-pressed="false">My time</button>
         </div>
         <span class="status" id="savemsg"></span>
       </div>
@@ -192,6 +207,29 @@ function localLabel(h, short){ // what server hour h is in the viewer's local ti
 const hh = h => String(h).padStart(2,"0")+":00";
 const slotTxt = s => `${DAYS_LONG[Math.floor(s/24)]} ${hh(s%24)}–${hh((s%24+1)%24)}`;
 const sameAsServer = () => localOffsetMin()===SERVER_OFFSET_MIN;
+const diffMin = () => localOffsetMin()-SERVER_OFFSET_MIN;           // local minus server
+const canLocal = () => !sameAsServer() && diffMin()%60===0;          // whole-hour difference: grid can be laid out in local time
+let tzMode = "server"; try{ if(localStorage.getItem("schedTz")==="local") tzMode="local"; }catch(e){}
+const useLocal = () => tzMode==="local" && canLocal();
+const fmt12 = h => `${(h%12)||12}:00 ${h<12?"AM":"PM"}`;
+const lab12 = h => `${(h%12)||12}<span class="mm">:00</span> ${h<12?"AM":"PM"}`;   // grid label; ":00" hides on phones
+const mod = (a,n) => ((a%n)+n)%n;
+// Where a grid cell (day d, row h) points in server slots, in whichever layout is showing.
+const cellSlot = (d,h) => useLocal() ? mod(d*24+h - diffMin()/60, 168) : d*24+h;
+const localSlot = s => mod(s + diffMin()/60, 168);
+function slotLong(s){ // primary line for a slot, plus the other clock
+  const sv=`${DAYS_LONG[Math.floor(s/24)]} ${hh(s%24)}`;
+  if(sameAsServer()) return {main:`${sv} server time`, sub:""};
+  if(!canLocal()) return {main:`${sv} server time`, sub:`Starts ${localLabel(s%24)} your time`};
+  const l=localSlot(s), lv=`${DAYS_LONG[Math.floor(l/24)]} ${fmt12(l%24)}`;
+  return useLocal() ? {main:`${lv} your time`, sub:`${sv} server time`} : {main:`${sv} server time`, sub:`${lv} your time`};
+}
+function slotShort(s){
+  const sv=`${DAYS[Math.floor(s/24)]} ${hh(s%24)}`;
+  if(sameAsServer()) return {main:sv, sub:"server"};
+  const l=localSlot(s), lv=canLocal()?`${DAYS[Math.floor(l/24)]} ${fmt12(l%24)}`:localLabel(s%24);
+  return useLocal() ? {main:lv, sub:`${sv} server`} : {main:sv, sub:`${lv} you`};
+}
 function tickClock(){ const n=serverNow();
   $("clock").textContent = `Server time now: ${DAYS[n.day]} ${String(n.hour).padStart(2,"0")}:${String(n.min).padStart(2,"0")}` +
     (sameAsServer() ? "" : ` · your time ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`);
@@ -219,11 +257,17 @@ function countFor(s){ let n=0; for(const a of Object.values(avail)) if(a.slots&&
 // ---------- Grid ----------
 function buildGrid(){
   const g=$("grid"); g.textContent="";
-  g.insertAdjacentHTML("beforeend",`<div class="dh"></div>`+DAYS.map((d,i)=>`<div class="dh" data-day="${i}">${d}</div>`).join(""));
+  const L=useLocal(); g.classList.toggle("one", sameAsServer());
+  const head = L ? `<div class="lh">You</div><div class="lh sec">Server</div>` : `<div class="lh">Server</div><div class="lh sec">You</div>`;
+  g.insertAdjacentHTML("beforeend",head+DAYS.map((d,i)=>`<div class="dh" data-day="${i}">${d}</div>`).join(""));
   for(let h=0;h<24;h++){
-    g.insertAdjacentHTML("beforeend",`<div class="hl">${hh(h)}${sameAsServer()?"":`<small>${localLabel(h,true)} you</small>`}</div>`);
-    for(let d=0;d<7;d++) g.insertAdjacentHTML("beforeend",`<div class="c" data-s="${d*24+h}" role="button" aria-label="${DAYS_LONG[d]} ${hh(h)} server time"></div>`);
+    const sv = L ? hh(mod(h - diffMin()/60, 24)) : hh(h);
+    const lv = L ? lab12(h) : (canLocal() ? lab12(mod(h + diffMin()/60, 24)) : localLabel(h));
+    g.insertAdjacentHTML("beforeend", L ? `<div class="hl">${lv}</div><div class="hl sec">${sv}</div>` : `<div class="hl">${sv}</div><div class="hl sec">${lv}</div>`);
+    for(let d=0;d<7;d++){ const s=cellSlot(d,h); g.insertAdjacentHTML("beforeend",`<div class="c" data-s="${s}" role="button" aria-label="${esc(slotLong(s).main)}"></div>`); }
   }
+  $("tzseg").hidden = !canLocal();
+  $("tz-server").setAttribute("aria-pressed", !L); $("tz-local").setAttribute("aria-pressed", L);
 }
 function paintGrid(){
   const total=Object.keys(avail).length;
@@ -240,8 +284,8 @@ function paintGrid(){
     ? `<i style="background:var(--accent)"></i> ${target()===me.uid?"You're":esc(nameFor(target()))+" is"} usually free <i style="background:var(--cell);margin-left:8px"></i> Not free`
     : `<span>Fewer free</span>${[.2,.45,.7,1].map(a=>`<i style="background:rgba(var(--heat),${a})"></i>`).join("")}<span>Most free</span><span style="margin-left:auto">${total} of ${Object.keys(roster()).length} members have set hours</span>`;
   $("hint").textContent = view==="mine"
-    ? (target()!==me.uid ? `Setting hours for ${nameFor(target())}. Tap or drag across the hours they're usually free. Saves automatically.` : "Tap or drag across the hours you're usually free each week. Times are server time. Changes save automatically.")
-    : "Numbers show how many members are free each hour (server time). Tap an hour to see who.";
+    ? (target()!==me.uid ? `Setting hours for ${nameFor(target())}. Tap or drag across the hours they're usually free. Saves automatically.` : `Tap or drag across the hours you're usually free each week. Times are ${useLocal()?"your own time":"server time"}. Changes save automatically.`)
+    : `Numbers show how many members are free each hour (${useLocal()?"your time":"server time"}). Tap an hour to see who.`;
   $("mytools").hidden = view!=="mine";
   $("forwrap").hidden = !(view==="mine" && isOfficer());
   if(!$("clearmine").dataset.armed) $("clearmine").textContent = target()===me.uid ? "Clear my hours" : `Clear ${nameFor(target())}'s hours`;
@@ -250,7 +294,10 @@ function paintGrid(){
 function markNow(){ const n=serverNow(), s=n.day*24+n.hour;
   document.querySelectorAll(".c.now").forEach(c=>c.classList.remove("now"));
   const c=document.querySelector(`.c[data-s="${s}"]`); if(c) c.classList.add("now");
-  document.querySelectorAll(".dh[data-day]").forEach(d=>d.classList.toggle("today",+d.dataset.day===n.day)); }
+  const today = useLocal() ? (new Date().getDay()+6)%7 : n.day;
+  document.querySelectorAll(".dh[data-day]").forEach(d=>d.classList.toggle("today",+d.dataset.day===today)); }
+function setTz(m){ tzMode=m; try{ localStorage.setItem("schedTz",m); }catch(e){} buildGrid(); if(isMember) paintGrid(); renderSide(); }
+$("tz-server").onclick=()=>setTz("server"); $("tz-local").onclick=()=>setTz("local");
 
 // Painting my hours: the first cell decides add or remove, then drag applies it.
 let paint=null;
@@ -293,8 +340,9 @@ function renderDetail(){
   for(const [id,name] of Object.entries(r)){ const a=avail[id]; if(!a) unset.push(name); else (a.slots.includes(selected)?free:busy).push(name); }
   const srt=a=>a.sort((x,y)=>x.localeCompare(y));
   box.hidden=false;
-  box.innerHTML=`<h2>${esc(slotTxt(selected))}</h2>
-    <p class="status" style="margin:0">Server time${sameAsServer()?"":` · starts ${localLabel(selected%24)} your time`}</p>
+  const lab=slotLong(selected);
+  box.innerHTML=`<h2>${esc(lab.main)}</h2>
+    ${lab.sub?`<p class="status" style="margin:0">${esc(lab.sub)}</p>`:""}
     <p style="margin:12px 0 0"><b>Free (${free.length})</b></p>${free.length?`<ul class="names yes">${srt(free).map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:'<p class="empty">Nobody yet.</p>'}
     <p style="margin:12px 0 0"><b>Not free (${busy.length})</b></p>${busy.length?`<ul class="names">${srt(busy).map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:'<p class="empty">Nobody.</p>'}
     ${unset.length?`<p style="margin:12px 0 0"><b>Haven't set hours (${unset.length})</b></p><ul class="names">${srt(unset).map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:""}`;
@@ -305,7 +353,7 @@ function renderBest(){
   if(!total){ $("bestlist").innerHTML='<li class="empty" style="display:block">No one has set hours yet.</li>'; return; }
   const ranked=[...Array(168).keys()].map(s=>[s,countFor(s)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]||a[0]-b[0]);
   const picks=[]; for(const [s,n] of ranked){ if(picks.length>=5) break; if(picks.some(([p])=>Math.abs(p-s)<=1)) continue; picks.push([s,n]); }
-  $("bestlist").innerHTML=picks.map(([s,n])=>`<li class="go" data-s="${s}"><span><b>${DAYS[Math.floor(s/24)]} ${hh(s%24)}</b> <span class="m">server${sameAsServer()?"":` · ${localLabel(s%24)} you`}</span></span><span class="m">${n} of ${total} free</span></li>`).join("");
+  $("bestlist").innerHTML=picks.map(([s,n])=>`<li class="go" data-s="${s}"><span><b>${esc(slotShort(s).main)}</b> <span class="m">${esc(slotShort(s).sub)}</span></span><span class="m">${n} of ${total} free</span></li>`).join("");
   $("bestlist").querySelectorAll("[data-s]").forEach(li=>li.onclick=()=>{ selected=+li.dataset.s; setView("guild"); document.querySelector(`.c[data-s="${selected}"]`).scrollIntoView({block:"center",behavior:"smooth"}); });
 }
 function renderMissing(){

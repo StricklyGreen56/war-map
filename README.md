@@ -50,7 +50,7 @@ Firestore → Data → delete the `admin` collection and the `editors` documents
 
 ## Guild schedule (`schedule.html`)
 
-A weekly availability grid for guild members only, linked from the map's **Guild schedule** button. All times are server time (UTC-2), and each hour also shows the viewer's local time.
+A weekly availability grid for guild members only, linked from the map's **Guild schedule** button. Times can be shown in server time (UTC-2) or the viewer's own time with the **Server time / My time** switch; the grid always shows both clocks side by side, and hours are always saved in server time.
 
 - **Access is separate from map editing.** A person signs in, enters their in-game name, and taps **Request guild access**. An admin approves them under **Guild requests** on the schedule page. Being a map editor does not give schedule access, and the other way around.
 - **Locked by the rules, not just hidden.** `firestore.rules` only lets approved members (and admins) read the roster and everyone's hours.
