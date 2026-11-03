@@ -136,6 +136,10 @@ select{font:inherit}
           <label class="field">Your in-game name<input type="text" id="r-name" maxlength="24" placeholder="e.g. Green"></label>
           <button class="btn" type="submit">Request guild access</button>
         </form>
+        <form id="n-form" class="row" style="margin-top:10px;align-items:flex-end" hidden>
+          <label class="field" style="flex:1;min-width:140px">Your in-game name<input type="text" id="n-name" maxlength="24" placeholder="e.g. Green"></label>
+          <button class="btn ghost" type="submit">Save name</button>
+        </form>
         <div class="row" style="margin-top:10px"><button class="btn ghost" id="a-signout">Sign out</button></div>
         <p class="note">Your user ID: <code id="a-uid" style="font-family:var(--f-mono);user-select:all;overflow-wrap:anywhere"></code></p>
       </div>
@@ -371,6 +375,8 @@ function refreshAccess(){
       : myRequest ? `Signed in. Your request as "${myRequest.name}" is waiting for an admin to approve it.`
       : `Signed in. Request guild access to see and set availability.`;
     $("r-form").hidden = isMember || !!myRequest;
+    $("n-form").hidden = !(isMember || myRequest);
+    if(document.activeElement!==$("n-name")) $("n-name").value = myRequest&&!isMember ? myRequest.name : myName();
     if(!$("r-name").value) $("r-name").value=(me.displayName||"").slice(0,24);
   }
   $("lockmsg").textContent = !me ? "Sign in, then request guild access. A guild admin approves each member."
@@ -409,6 +415,16 @@ $("a-form").onsubmit=async e=>{ e.preventDefault(); if(!auth) return; const emai
   try{ creating ? await auth.createUserWithEmailAndPassword(email,pass) : await auth.signInWithEmailAndPassword(email,pass); $("a-pass").value=""; amsg(""); }
   catch(err){ amsg(authErr(err)); } finally{ $("a-go").disabled=false; } };
 $("a-signout").onclick=async()=>{ try{ await auth.signOut(); }catch(e){} };
+$("n-form").onsubmit=async e=>{ e.preventDefault(); const n=$("n-name").value.trim().slice(0,24);
+  if(!n) return amsg("Type your in-game name first.");
+  if(DEMO){ if(members[me.uid]) members[me.uid].name=n; if(myMember) myMember.name=n; if(avail[me.uid]) avail[me.uid].name=n; me.displayName=n; refreshAccess(); return amsg(`Saved. You show as ${n} now.`); }
+  try{
+    await me.updateProfile({displayName:n});
+    if(myMember) await fs.doc("members/"+me.uid).update({name:n});
+    else if(myRequest){ myRequest={...myRequest,name:n}; await fs.doc("guildRequests/"+me.uid).set(myRequest); }
+    if(avail[me.uid]) await fs.doc("avail/"+me.uid).update({name:n});
+    refreshAccess(); amsg(`Saved. You show as ${n} now.`);
+  }catch(err){ amsg(err&&err.code==="permission-denied" ? "Couldn't save your name. Ask the admin to publish the latest rules." : "Couldn't save your name. Try again."); } };
 $("r-form").onsubmit=async e=>{ e.preventDefault(); const n=$("r-name").value.trim().slice(0,24); if(!n) return amsg("Enter your in-game name so the admin knows who you are.");
   try{ const r={name:n,email:(me.email||"").slice(0,120),at:Date.now()}; await fs.doc("guildRequests/"+me.uid).set(r); myRequest=r; refreshAccess(); amsg("Request sent. This page unlocks once an admin approves you."); }
   catch(err){ amsg("Couldn't send the request. Try again."); } };
