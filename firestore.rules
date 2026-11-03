@@ -127,6 +127,47 @@ service cloud.firestore {
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
     }
 
+    // Events on real dates. start = epoch ms; dur = hours. Officers and admins post them.
+    match /events/{id} {
+      allow read: if isMember();
+      allow create, update: if isOfficer()
+        && request.resource.data.keys().hasOnly(['title', 'start', 'dur', 'note', 'by', 'at'])
+        && str(request.resource.data.title, 60) && request.resource.data.title.size() > 0
+        && request.resource.data.start is number
+        && request.resource.data.dur is number && request.resource.data.dur >= 1 && request.resource.data.dur <= 12
+        && str(request.resource.data.note, 200)
+        && str(request.resource.data.by, 24)
+        && request.resource.data.at is number;
+      allow delete: if isOfficer();
+    }
+
+    // RSVPs. Document ID is <eventId>_<uid>. Members answer for themselves.
+    match /rsvps/{rid} {
+      allow read: if isMember();
+      allow create, update: if isMember()
+        && request.resource.data.keys().hasOnly(['ev', 'uid', 'name', 'going', 'at'])
+        && str(request.resource.data.ev, 40)
+        && str(request.resource.data.uid, 128)
+        && str(request.resource.data.name, 24)
+        && request.resource.data.going is bool
+        && request.resource.data.at is number
+        && rid == request.resource.data.ev + '_' + request.resource.data.uid
+        && (request.resource.data.uid == request.auth.uid || isOfficer());
+      allow delete: if isOfficer() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // Days a member is away (dates as YYYY-MM-DD, server calendar).
+    match /away/{uid} {
+      allow read: if isMember();
+      allow create, update: if ((isMember() && request.auth.uid == uid) || isOfficer())
+        && request.resource.data.keys().hasOnly(['name', 'dates', 'at'])
+        && str(request.resource.data.name, 24)
+        && request.resource.data.dates is list
+        && request.resource.data.dates.size() <= 60
+        && request.resource.data.at is number;
+      allow delete: if isOfficer() || (signedIn() && request.auth.uid == uid);
+    }
+
     // Anything else (including the old passcode) is closed.
     match /{document=**} {
       allow read, write: if false;

@@ -58,7 +58,9 @@ A weekly availability grid for guild members only, linked from the map's **Guild
 - **Guild view** shows how many members are free each hour. Tap an hour to see who's free, who isn't, and who hasn't set hours. **Best times** lists the top hours.
 - **Officers:** in the Members list, an admin taps **☆ Officer** to make someone an officer. Officers can set hours for anyone using the **Editing hours for** dropdown in My hours. Approving, removing and adding members stay admin-only. Admins can also tap **Set hours** on any member, or add someone without an account.
 - **Changing your name:** any member (or someone waiting for approval) can open their account card, type their in-game name and tap **Save name**. It updates their roster entry and saved hours.
+- **Events:** admins and officers tap **New event** to post one on a real date (name, date, start time, length, notes). The time is entered in whichever clock the page is showing. Everyone can tap **Going** or **Can't make it**, and each event lists who's going, who can't, who's usually free but hasn't answered, who's away, and who hasn't set hours. Events drop off 12 hours after they end.
+- **Away days:** members add dates they can't play under **Days you're away**. They won't count as free for events those days. Officers and admins can set away days for others with the **Editing hours for** dropdown.
 - **Removing a member** (Members list → Remove → tap again) deletes their roster entry and their hours.
-- Data: `guildRequests`, `members`, `avail` collections. To preview the page with fake data, open `schedule.html?demo`.
+- Data: `guildRequests`, `members`, `avail`, `events`, `rsvps`, `away` collections. To preview the page with fake data, open `schedule.html?demo`.
 
 **Setup:** publish the updated `firestore.rules` (Firestore → Rules → paste → Publish). Admins are the same `admins` collection the map uses, so nothing else is needed.
