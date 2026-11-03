@@ -84,7 +84,11 @@ select{font:inherit}
 .legend i{width:18px;height:12px;border-radius:3px;display:inline-block}
 .lock{text-align:center;padding:30px 10px}
 .lock h3{font-family:var(--f-display);font-size:1.4rem;margin:0 0 6px}
-.btnrow{flex-wrap:nowrap}
+.list li.mem{display:block;position:relative}
+.mem .rm{position:absolute;top:8px;right:8px;border:0;color:var(--muted);padding:4px 6px}
+.mem .rm[data-armed]{color:#d14343;font-weight:700}
+.mem .btnrow{margin-top:8px;flex-wrap:wrap;gap:6px}
+.mem .btn{padding:5px 10px;font-size:.82rem;white-space:nowrap}
 .leftcol{display:flex;flex-direction:column;gap:12px;min-width:0}
 input[type=date],.evform select,.evform textarea{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%;font:inherit;color:inherit}
 .evform{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px dashed var(--line);border-radius:10px;margin:0 0 12px}
@@ -110,7 +114,6 @@ input[type=date],.evform select,.evform textarea{background:var(--bg);border:1px
   .dh small{font-size:.6rem;white-space:nowrap}
   .dh .evdot{width:5px;height:5px;margin-left:1px}
   .weekbar .wk{min-width:0;font-size:1rem}
-  .btnrow{flex-wrap:wrap!important;justify-content:flex-end}
   .c{font-size:.62rem}
   .card{padding:12px 10px}
 }
@@ -466,7 +469,7 @@ function renderAdmin(){
   $("reqlist").querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>deny(b.dataset.no));
   if(!isAdmin) return;
   const ms=Object.entries(members).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
-  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${m.officer?"<b>Officer</b> · ":""}${m.approver?"<b>Approver</b> · ":""}${avail[id]?"Hours set":"No hours yet"}${m.manual?" · no account":""}</span></span><span class="row btnrow">${m.manual?"":`<button class="btn ghost" data-off="${esc(id)}" title="${m.officer?"Remove officer":"Make officer"}">${m.officer?"★ Officer":"☆ Officer"}</button><button class="btn ghost" data-appr="${esc(id)}" title="${m.approver?"Remove approver":"Make approver"}">${m.approver?"★ Approver":"☆ Approver"}</button>`}<button class="btn ghost" data-set="${esc(id)}">Set hours</button><button class="btn ghost" data-rm="${esc(id)}">Remove</button></span></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
+  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li class="mem"><span><b>${esc(m.name||"Member")}</b><br><span class="m">${m.officer?"<b>Officer</b> · ":""}${m.approver?"<b>Approver</b> · ":""}${avail[id]?"Hours set":"No hours yet"}${m.manual?" · no account":""}</span></span><span class="row btnrow">${m.manual?"":`<button class="btn ghost" data-off="${esc(id)}" title="${m.officer?"Remove officer":"Make officer"}">${m.officer?"★ Officer":"☆ Officer"}</button><button class="btn ghost" data-appr="${esc(id)}" title="${m.approver?"Remove approver":"Make approver"}">${m.approver?"★ Approver":"☆ Approver"}</button>`}<button class="btn ghost" data-set="${esc(id)}">Set hours</button></span><button class="btn ghost rm" data-rm="${esc(id)}">Remove</button></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
   $("memlist").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeMember(b.dataset.rm,b));
   $("memlist").querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>editHoursFor(b.dataset.set));
   $("memlist").querySelectorAll("[data-off]").forEach(b=>b.onclick=()=>toggleOfficer(b.dataset.off));
