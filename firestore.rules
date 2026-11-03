@@ -81,13 +81,13 @@ service cloud.firestore {
 
     // Anyone signed in can ask to join; only admins see the list.
     match /guildRequests/{uid} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow read: if isApprover() || (signedIn() && request.auth.uid == uid);
       allow create, update: if signedIn() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['name', 'email', 'at'])
         && str(request.resource.data.name, 24)
         && str(request.resource.data.email, 120)
         && request.resource.data.at is number;
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow delete: if isApprover() || (signedIn() && request.auth.uid == uid);
     }
 
     // Officers are members an admin marked with officer: true. They can set anyone's hours.
@@ -97,12 +97,26 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get('officer', false) == true);
     }
 
+    // Approvers are members an admin marked with approver: true. They accept or deny join requests.
+    function isApprover() {
+      return isAdmin() || (signedIn()
+        && exists(/databases/$(database)/documents/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get('approver', false) == true);
+    }
+
     // The guild roster. Only members see it; a person can check their own entry.
     // manual = added by an admin for someone without an account.
     match /members/{uid} {
       allow read: if isMember() || (signedIn() && request.auth.uid == uid);
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['name', 'at', 'by', 'manual', 'officer'])
+        && request.resource.data.keys().hasOnly(['name', 'at', 'by', 'manual', 'officer', 'approver'])
+        && str(request.resource.data.name, 24)
+        && str(request.resource.data.by, 24)
+        && request.resource.data.at is number;
+      // An approver can add someone who has a pending request, with no special roles.
+      allow create: if isApprover()
+        && exists(/databases/$(database)/documents/guildRequests/$(uid))
+        && request.resource.data.keys().hasOnly(['name', 'at', 'by'])
         && str(request.resource.data.name, 24)
         && str(request.resource.data.by, 24)
         && request.resource.data.at is number;

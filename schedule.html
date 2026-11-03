@@ -243,13 +243,15 @@ input[type=date],.evform select,.evform textarea{background:var(--bg);border:1px
     <section class="card" id="admin" hidden>
       <h2>Guild requests</h2>
       <ul class="list" id="reqlist"></ul>
+      <div id="admin-members">
       <h2 style="margin-top:16px">Members</h2>
       <ul class="list" id="memlist"></ul>
       <form id="add-form" class="row" style="margin-top:10px;align-items:flex-end">
         <label class="field" style="flex:1;min-width:140px">Add someone without an account<input type="text" id="add-name" maxlength="24" placeholder="In-game name"></label>
         <button class="btn ghost" type="submit">Add</button>
       </form>
-      <p class="note">Tap <b>☆ Officer</b> to let a member set hours for others (they use the dropdown in My hours). Tap <b>Set hours</b> to fill in hours for anyone. People you add here don't need to sign in. Removing someone also deletes their hours.</p>
+      <p class="note">Tap <b>☆ Officer</b> to let a member set hours for others (they use the dropdown in My hours). Tap <b>Set hours</b> to fill in hours for anyone. People you add here don't need to sign in. Tap <b>☆ Approver</b> to let a member accept or deny join requests. Removing someone also deletes their hours.</p>
+      </div>
     </section>
   </aside>
 </main>
@@ -315,6 +317,7 @@ function roster(){ // everyone who counts: approved members plus anyone with sav
   for(const [id,a] of Object.entries(avail)) if(!r[id]) r[id]=a.name||"Member";
   return r; }
 const isOfficer = () => !!(isAdmin || (myMember && myMember.officer));
+const isApprover = () => !!(isAdmin || (myMember && myMember.approver));
 const target = () => (isOfficer() && editFor) || (me && me.uid);
 const nameFor = id => id===(me&&me.uid) ? myName() : ((members[id]&&members[id].name) || (avail[id]&&avail[id].name) || "Member").slice(0,24);
 function loadMine(){ const a=avail[target()]; mine=new Set(a?a.slots:[]); }
@@ -457,15 +460,17 @@ function renderMissing(){
   $("misslist").innerHTML=miss.map(n=>`<li>${esc(n)}</li>`).join("");
 }
 function renderAdmin(){
-  $("admin").hidden=!isAdmin; if(!isAdmin) return;
+  $("admin").hidden=!isApprover(); $("admin-members").hidden=!isAdmin; if(!isApprover()) return;
   $("reqlist").innerHTML = requests.length ? requests.map(r=>`<li><span><b>${esc(r.name||"Someone")}</b><br><span class="m">${esc(r.email||"")}</span></span><span class="row"><button class="btn" data-ok="${esc(r.id)}">Approve</button><button class="btn ghost" data-no="${esc(r.id)}">Deny</button></span></li>`).join("") : '<li class="empty" style="display:block">No requests right now.</li>';
-  const ms=Object.entries(members).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
-  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${m.officer?"<b>Officer</b> · ":""}${avail[id]?"Hours set":"No hours yet"}${m.manual?" · no account":""}</span></span><span class="row btnrow">${m.manual?"":`<button class="btn ghost" data-off="${esc(id)}" title="${m.officer?"Remove officer":"Make officer"}">${m.officer?"★ Officer":"☆ Officer"}</button>`}<button class="btn ghost" data-set="${esc(id)}">Set hours</button><button class="btn ghost" data-rm="${esc(id)}">Remove</button></span></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
   $("reqlist").querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>approve(b.dataset.ok));
   $("reqlist").querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>deny(b.dataset.no));
+  if(!isAdmin) return;
+  const ms=Object.entries(members).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+  $("memlist").innerHTML = ms.length ? ms.map(([id,m])=>`<li><span><b>${esc(m.name||"Member")}</b><br><span class="m">${m.officer?"<b>Officer</b> · ":""}${m.approver?"<b>Approver</b> · ":""}${avail[id]?"Hours set":"No hours yet"}${m.manual?" · no account":""}</span></span><span class="row btnrow">${m.manual?"":`<button class="btn ghost" data-off="${esc(id)}" title="${m.officer?"Remove officer":"Make officer"}">${m.officer?"★ Officer":"☆ Officer"}</button><button class="btn ghost" data-appr="${esc(id)}" title="${m.approver?"Remove approver":"Make approver"}">${m.approver?"★ Approver":"☆ Approver"}</button>`}<button class="btn ghost" data-set="${esc(id)}">Set hours</button><button class="btn ghost" data-rm="${esc(id)}">Remove</button></span></li>`).join("") : '<li class="empty" style="display:block">No members yet.</li>';
   $("memlist").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeMember(b.dataset.rm,b));
   $("memlist").querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>editHoursFor(b.dataset.set));
   $("memlist").querySelectorAll("[data-off]").forEach(b=>b.onclick=()=>toggleOfficer(b.dataset.off));
+  $("memlist").querySelectorAll("[data-appr]").forEach(b=>b.onclick=()=>toggleApprover(b.dataset.appr));
   renderPicker();
 }
 function renderSide(){ renderDetail(); renderBest(); renderMissing(); renderAdmin(); renderEvents(); renderAway(); if(isOfficer()) renderPicker(); if(isMember) paintGrid(); }
@@ -580,6 +585,9 @@ $("add-form").onsubmit=async e=>{ e.preventDefault(); const n=$("add-name").valu
   if(DEMO){ members[id]={name:n,at:Date.now(),by:myName(),manual:true}; $("add-name").value=""; return renderSide(); }
   try{ await fs.doc("members/"+id).set({name:n,at:Date.now(),by:myName(),manual:true}); $("add-name").value=""; }
   catch(err){ amsg("Couldn't add them. Publish the latest rules in Firebase first."); openAcct(); } };
+async function toggleApprover(id){ const m=members[id]; if(!m) return; const on=!m.approver;
+  if(DEMO){ m.approver=on; return renderSide(); }
+  try{ await fs.doc("members/"+id).update({approver:on}); }catch(e){ amsg("Couldn't change approver status. Publish the latest rules in Firebase first."); openAcct(); } }
 async function toggleOfficer(id){ const m=members[id]; if(!m) return; const on=!m.officer;
   if(DEMO){ m.officer=on; return renderSide(); }
   try{ await fs.doc("members/"+id).update({officer:on}); }catch(e){ amsg("Couldn't change officer status. Publish the latest rules in Firebase first."); openAcct(); } }
@@ -606,7 +614,7 @@ function refreshAccess(){
   if(me){
     $("a-uid").textContent=me.uid;
     $("a-who").textContent = isAdmin ? `Signed in as ${myName()}. You're an admin: you approve guild members.`
-      : myMember && myMember.officer ? `Signed in as ${myMember.name}. You're an officer: you can set hours for anyone in My hours.`
+      : myMember && (myMember.officer || myMember.approver) ? `Signed in as ${myMember.name}. You're ${[myMember.officer?"an officer (set hours for anyone in My hours)":"", myMember.approver?"an approver (accept join requests below)":""].filter(Boolean).join(" and ")}.`
       : myMember ? `Signed in as ${myMember.name}. You're on the guild list.`
       : myRequest ? `Signed in. Your request as "${myRequest.name}" is waiting for an admin to approve it.`
       : `Signed in. Request guild access to see and set availability.`;
@@ -635,7 +643,7 @@ function listenGuild(){ // only called once the rules let this person read the g
   unsubs.push(fs.collection("events").onSnapshot(s=>{ events=s.docs.map(d=>({id:d.id,...d.data()})); renderEvents(); paintGrid(); renderDetail(); }, ()=>{}));
   unsubs.push(fs.collection("rsvps").onSnapshot(s=>{ const r={}; s.docs.forEach(d=>{ const x=d.data(); (r[x.ev]=r[x.ev]||{})[x.uid]={going:x.going,name:x.name}; }); rsvps=r; renderEvents(); }, ()=>{}));
   unsubs.push(fs.collection("away").onSnapshot(s=>{ const a={}; s.docs.forEach(d=>a[d.id]=d.data()); away=a; renderAway(); renderEvents(); paintGrid(); renderDetail(); }, ()=>{}));
-  if(isAdmin) unsubs.push(fs.collection("guildRequests").onSnapshot(s=>{ requests=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.at-b.at); renderAdmin(); }, ()=>{}));
+  if(isApprover()) unsubs.push(fs.collection("guildRequests").onSnapshot(s=>{ requests=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.at-b.at); renderAdmin(); }, ()=>{}));
 }
 
 // ---------- Sign-in ----------
@@ -697,7 +705,8 @@ if(DEMO){
         try{ isAdmin=(await fs.doc("admins/"+u.uid).get()).exists; }catch(e){}
         try{ const r=await fs.doc("guildRequests/"+u.uid).get(); myRequest=r.exists?r.data():null; }catch(e){}
         // Watch my own roster entry so approval or removal takes effect without a reload.
-        unsubMe=fs.doc("members/"+u.uid).onSnapshot(d=>{ const was=!!(isAdmin||myMember); myMember=d.exists?d.data():null; if(myMember) myRequest=null;
+        unsubMe=fs.doc("members/"+u.uid).onSnapshot(d=>{ const was=!!(isAdmin||myMember), wasAppr=isApprover(); myMember=d.exists?d.data():null; if(myMember) myRequest=null;
+          if(was && myMember && wasAppr!==isApprover()){ listenGuild(); if(!isApprover()) requests=[]; }
           const now=!!(isAdmin||myMember); if(now&&!was) listenGuild(); if(!now){ stopListening(); members={}; avail={}; events=[]; rsvps={}; away={}; } refreshAccess(); }, ()=>{});
         if(isAdmin) listenGuild();
       }
